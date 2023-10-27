@@ -15,7 +15,10 @@ def convert_dihedral(mapping, mol1_dih):
 
 def rd_map_mols(rdmol1, rdmol2):
 	mcs = rdFMCS.FindMCS([rdmol1, rdmol2])
+
 	patt = Chem.MolFromSmarts(mcs.smartsString)
+
+
 	rdmol1_match = rdmol1.GetSubstructMatch(patt)
 	rdmol2_match = rdmol2.GetSubstructMatch(patt)
 
@@ -49,3 +52,4 @@ def map_mols(mol1, mol2):
 	else: 
 		raise utils.NotImplementedError
 
+	return mapping

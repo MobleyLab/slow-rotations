@@ -10,10 +10,13 @@ from MDAnalysis.analysis.dihedrals import Dihedral
 from MDAnalysis.analysis import distances
 
 import utils
+import mappings
 import rdkit_wrapper as rdw
 import molconverter as mc
 import matplotlib.pyplot as plt
+from PIL import Image
 import numpy as np
+import pandas as pd
 from sklearn.mixture import GaussianMixture
 from scipy.signal import find_peaks
 from sklearn.neighbors import KernelDensity
@@ -115,7 +118,6 @@ class TorsionFinder():
             c_center = kmeans.cluster_centers_[c][0]
                         
             centroid_index = None
-            print(c_angles)
             min_diff = 999999999
             min_i = None
             for i,a in enumerate(c_angles):
@@ -142,14 +144,40 @@ class TorsionFinder():
             min_max.append((c_angles[min_i],c_angles[max_i]))
         return min_max
 
-    def get_gmm(self, X, score, num_components, angle_min):
+
+    def get_individual_gmm(self, X, angle_min, min_max):
+        num_components = 1
+        min_bnd = min_max[0]
+        max_bnd = min_max[1]
+        min_max_range = max_bnd - min_bnd
+
+        single_state_X = list()
+
+        print(X)
+
+        for point in X:
+            if point[0] >= min_bnd and point[0] <= max_bnd:
+                single_state_X.append(point)
+
+        gmm, x, pdf, pdf_individual = self.get_gmm(single_state_X, num_components, angle_min)
+
+        frac = len(single_state_X)/len(X)
+        pdf_individual = pdf_individual*frac
+        pdf_individual = np.array([x.flatten(), pdf_individual.flatten()])
+        
+        return gmm,x,pdf,pdf_individual
+
+
+    def get_gmm(self, X, num_components, angle_min):
+        flat_X = np.array(X).flatten()
         gmm = GaussianMixture(n_components=num_components).fit(np.array(X).reshape(-1,1))
-        x = np.linspace(angle_min, angle_min+360, len(X))
+        x = np.linspace(min(flat_X), max(flat_X), len(X))
         logprob = gmm.score_samples(x.reshape(-1, 1))
         responsibilities = gmm.predict_proba(x.reshape(-1, 1))
         pdf = np.exp(logprob)
         pdf_individual = responsibilities * pdf[:, np.newaxis]
-        
+
+
         return gmm, x, pdf, pdf_individual
 
     def get_bounds_gmm():
@@ -203,13 +231,14 @@ class TorsionFinder():
             plt.savefig(savepath)
         return f,ax
 
-    def plot_dihedral_histogram(self, torsion, angle_min=None, title=None, ax=None, num_bins=60, alpha=0.5, show=True, color=None):
-        angle_min, angles = self.shift_torsion_angles(torsion, num_bins, angle_min=angle_min)
-
-        X = np.array(angles).flatten()
-        if ax == None:
+    def plot_dihedral_histogram(self, torsion, angles=[], angle_min=None, pdf_individual=[], ax=None, title=None, num_bins=60, alpha=0.5, show=True, color=None, save_path=None):
+        if not ax:
             f, ax = plt.subplots()
 
+        if angle_min == None:
+            angle_min, angles = self.shift_torsion_angles(torsion, num_bins, angle_min=angle_min)
+
+        X = np.array(angles).flatten()
         kwargs = dict()
         if color != None:
             kwargs['color']=color
@@ -217,11 +246,39 @@ class TorsionFinder():
         ax.set_xlim([angle_min, angle_min+360])
         ax.set_xlabel("Dihedral Angle (˚)")
         ax.set_ylabel("Frequency")
+
+        pdf_individual_sort = sorted(pdf_individual, key=len)
+        colors = ['red', 'orange', 'green', 'blue', 'purple', 'brown']
+
+        for i,pdf in enumerate(pdf_individual_sort):
+            ax.plot(pdf[0], pdf[1], color=colors[i])
+
         if title:
             ax.set_title(title)
         if show:
             plt.show()
-        return f,ax
+        if save_path:
+            plt.savefig(save_path, dpi=500)
+
+    def plot_transition_matrix(self, transition_matrix, ax=None):
+
+        if not ax:
+            f,ax = plt.subplots()
+
+        df = pd.DataFrame(data=transition_matrix, columns=['transitions in', 'transitions out'])
+        table = ax.table(
+            cellText=df.values, 
+            colLabels=df.columns, 
+            rowLabels=[f"s{i}" for i in range(len(df))],
+            loc='center',
+        )
+        cells = table.properties()["celld"]
+        for i in range(0, len(df)+1):
+            cells[i, 0].set_text_props(ha="center")
+            cells[i, 1].set_text_props(ha="center")
+
+        ax.axis('off')
+
 
 class ProteinTorsionFinder(TorsionFinder):
 
@@ -375,11 +432,113 @@ class ProteinTorsionFinder(TorsionFinder):
 
         resnames = list()
         for r in chi_x_resgrp:
-            print(r)
             resnames.append(r.resname)
 
-        print(set(resnames))
         return self.get_chi_x_aid(x, chi_x_resgrp)
+
+
+
+    def save_traj_sel(self, sel, frames, save_path):
+        ''' saves out the atoms selected in sel as a new file for the 
+            purpose of this program meant to save out a single 
+            amino acid as a pdb file
+
+            sel:        selection string using MDAnalysis atom selection language
+            frames:     2 membered tuple with the start and end (not inclusive)
+                        frame to save out [start, end)
+            save_path:  path to save 
+        '''
+        ag = self.mda_universe.select_atoms(sel)
+
+        print(ag)
+
+        start_incl, end_nincl = frames
+
+        with mda.Writer(save_path, ag.n_atoms) as w:
+            for ts in self.mda_universe.trajectory[start_incl:end_nincl]:
+                w.write(ag)
+
+
+
+    def highlight_dihedral(self, dihedral, save_path=None):
+        ''' highlights the dihedral of a protein sidechain
+            * exports the protein residue as a single AA pdb
+            * loads in the single protein into rdkit with and
+              without Hs
+            * compares the 2 to get atom orderings via MCS
+        '''
+        sel_resid = self.get_residue_from_torsion(dihedral)
+        min_res_aidx = min([a.index for a in sel_resid.atoms])
+
+        with tempfile.NamedTemporaryFile(suffix='.pdb') as aapdb:
+
+            print(f'resid {sel_resid.resid}')
+
+            self.save_traj_sel(f'resid {sel_resid.resid}', (0,1), aapdb.name)
+
+            rdmol_wH = rdw.load_rdmol_from_file(aapdb.name, removeHs=False)
+            rdmol_woH = rdw.load_rdmol_from_file(aapdb.name, removeHs=True)
+
+            mapping = mappings.map_mols(rdmol_wH, rdmol_woH)
+
+            adj_dih = [idx - min_res_aidx for idx in dihedral]
+
+            woH_adj_dih = mappings.convert_dihedral(mapping, adj_dih)
+
+            rdw.highlight_dihedral(rdmol_woH, woH_adj_dih, save_path)
+
+
+    def get_residue_from_torsion(self, torsion):
+        sel_atm_in_dih = self.mda_universe.select_atoms(f"index {torsion[0]}")
+        return sel_atm_in_dih[0].residue
+
+    def determine_chi_x(self, torsion):
+        raise utils.NotImplementedError
+
+
+    def make_aa_torsions_img(self, torsion, show=False):
+        
+        d1,d2,d3,d4 = tuple(torsion)
+
+        sel_a_in_dih = self.mda_universe.select_atoms(f"index {torsion[0]}")
+        sel_resid = sel_a_in_dih[0].residue
+
+
+        f,ax = plt.subplots(1, 3, figsize=(25, 6.25))
+        sup_title = f"{sel_resid.resname} {sel_resid.resid} ({d1},{d2},{d3},{d4})"
+        f.suptitle(sup_title,fontsize=60)
+        f.tight_layout(pad=3.5)
+
+        X, scores, angle_min = self.get_kde(torsion)
+
+        
+
+        num_peaks = self.get_kde_num_peaks(scores, smoothing_window=100, peak_prominence=0.008)
+        
+        min_max = self.get_bounds_knn(X, num_peaks)
+        angles = self.shift_torsion_angles(torsion, angle_min=angle_min)[1].flatten()
+
+        transition_matrix = self.transition_counter(angles, min_max)
+
+        with tempfile.NamedTemporaryFile(suffix='.png') as highlightpng:
+
+            self.highlight_dihedral(torsion, save_path=highlightpng)
+            img = np.asarray(Image.open(highlightpng.name))
+            ax[0].imshow(img)
+            ax[0].axis('off')
+
+        pdf_individual = []
+        for mm in min_max:
+            gmm,x,pdf,pdfi = self.get_individual_gmm(X, angle_min, mm)
+            pdf_individual.append(pdfi)
+
+        states_list = [f"s{i}" for i in range(num_peaks)]
+        self.plot_dihedral_histogram(torsion, ax=ax[1], show=False, pdf_individual=pdf_individual)
+        ax[1].legend(states_list)
+        self.plot_transition_matrix(transition_matrix, ax=ax[2])
+
+
+
 
 
 

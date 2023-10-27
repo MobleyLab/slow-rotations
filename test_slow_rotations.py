@@ -38,73 +38,73 @@ for a in ags:
 
 
 
-# smiles_mol = rdkit.Chem.MolFromSmiles(smiles)
-# smiles_mol = rdkit.Chem.AddHs(smiles_mol)
+smiles_mol = rdkit.Chem.MolFromSmiles(smiles)
+smiles_mol = rdkit.Chem.AddHs(smiles_mol)
 
 
-# mol2_mol = rdkit.Chem.MolFromMol2File(molfile)
+mol2_mol = rdkit.Chem.MolFromMol2File(molfile)
 
-# assigned_mol = rdw.assign_bond_order_from_smiles(smiles, molfile)
-# assigned_mol = rdw.sanitize_rdmol(mol2_mol)
+assigned_mol = rdw.assign_bond_order_from_smiles(smiles, molfile)
+assigned_mol = rdw.sanitize_rdmol(mol2_mol)
 
-# for a, b, c in zip(smiles_mol.GetAtoms(), mol2_mol.GetAtoms(), assigned_mol.GetAtoms()):
-# 	print(f"{a.GetAtomicNum()}\t{b.GetAtomicNum()}\t{c.GetAtomicNum()}")
-
-
-# u = mda.Universe(topf, trajf)
-# print(u)
-# atms = u.select_atoms("all")
-# for r,j in zip(lig_tor_find.rdmol.GetAtoms(),atms):
-# 	print(f"{r.GetAtomicNum()}\t{j.name}")
-
-# ags = [mda.AtomGroup(u.atoms[([2,7,13,17])])]
-# Run = Dihedral(ags).run()
-# shape = (Run.results.angles.shape)
-# angles = Run.results.angles
-
-# print(angles)
-
-# atms = u.select_atoms("all")
-# atms.write("/Users/megosato/Desktop/test.pdb", frames=u.trajectory[[0,]])
+for a, b, c in zip(smiles_mol.GetAtoms(), mol2_mol.GetAtoms(), assigned_mol.GetAtoms()):
+	print(f"{a.GetAtomicNum()}\t{b.GetAtomicNum()}\t{c.GetAtomicNum()}")
 
 
-# rdmol_smiles = rdkit.Chem.MolFromSmiles(smiles)
-# rdmol_smiles = rdkit.Chem.AddHs(rdmol_smiles)
-# rdmol_mol2 = rdw.load_rdmol_from_file(molfile)
+u = mda.Universe(topf, trajf)
+print(u)
+atms = u.select_atoms("all")
+for r,j in zip(lig_tor_find.rdmol.GetAtoms(),atms):
+	print(f"{r.GetAtomicNum()}\t{j.name}")
 
-# i = 0
-# for a, b in zip(rdmol_smiles.GetAtoms(), rdmol_mol2.GetAtoms()):
-# 	print(a.GetAtomicNum(), b.GetAtomicNum())
-# 	i += 1
-# print(i)
+ags = [mda.AtomGroup(u.atoms[([2,7,13,17])])]
+Run = Dihedral(ags).run()
+shape = (Run.results.angles.shape)
+angles = Run.results.angles
+
+print(angles)
+
+atms = u.select_atoms("all")
+atms.write("/Users/megosato/Desktop/test.pdb", frames=u.trajectory[[0,]])
 
 
-# mcs = rdFMCS.FindMCS([rdmol_smiles, rdmol_mol2])
+rdmol_smiles = rdkit.Chem.MolFromSmiles(smiles)
+rdmol_smiles = rdkit.Chem.AddHs(rdmol_smiles)
+rdmol_mol2 = rdw.load_rdmol_from_file(molfile)
 
-# print(mcs.numAtoms)
+i = 0
+for a, b in zip(rdmol_smiles.GetAtoms(), rdmol_mol2.GetAtoms()):
+	print(a.GetAtomicNum(), b.GetAtomicNum())
+	i += 1
+print(i)
 
-# patt = rdkit.Chem.MolFromSmarts(mcs.smartsString)
-# query_match = rdmol_smiles.GetSubstructMatch(patt)
-# template_match = rdmol_mol2.GetSubstructMatch(patt)
 
-# print("query:", query_match)
-# print("templ:", template_match)
+mcs = rdFMCS.FindMCS([rdmol_smiles, rdmol_mol2])
 
-# def get_atom_by_index(mol, idx):
-# 	for a in mol.GetAtoms():
-# 		if a.GetIdx() == idx:
-# 			return a
+print(mcs.numAtoms)
 
-# print(type(rdmol_smiles))
+patt = rdkit.Chem.MolFromSmarts(mcs.smartsString)
+query_match = rdmol_smiles.GetSubstructMatch(patt)
+template_match = rdmol_mol2.GetSubstructMatch(patt)
 
-# for q,t in zip(query_match,template_match):
-# 	print(get_atom_by_index(rdmol_smiles,q).GetAtomicNum(), get_atom_by_index(rdmol_mol2,t).GetAtomicNum())
+print("query:", query_match)
+print("templ:", template_match)
 
-# rdmol_smiles = rdw.sanitize_rdmol(rdmol_smiles)
-# oe_smiles = mc.get_oemol_from_rdmol(rdmol_smiles)
-# rdmol_mol2 = rdw.sanitize_rdmol(rdmol_mol2)
-# oe_mol2 = mc.get_oemol_from_rdmol(rdmol_mol2)
-# for q,t in zip(query_match,template_match):
-# 	print(get_atom_by_index(oe_smiles, q).GetAtomicNum(), get_atom_by_index(oe_mol2, t).GetAtomicNum())
+def get_atom_by_index(mol, idx):
+	for a in mol.GetAtoms():
+		if a.GetIdx() == idx:
+			return a
 
-# print(type(oe_smiles))
+print(type(rdmol_smiles))
+
+for q,t in zip(query_match,template_match):
+	print(get_atom_by_index(rdmol_smiles,q).GetAtomicNum(), get_atom_by_index(rdmol_mol2,t).GetAtomicNum())
+
+rdmol_smiles = rdw.sanitize_rdmol(rdmol_smiles)
+oe_smiles = mc.get_oemol_from_rdmol(rdmol_smiles)
+rdmol_mol2 = rdw.sanitize_rdmol(rdmol_mol2)
+oe_mol2 = mc.get_oemol_from_rdmol(rdmol_mol2)
+for q,t in zip(query_match,template_match):
+	print(get_atom_by_index(oe_smiles, q).GetAtomicNum(), get_atom_by_index(oe_mol2, t).GetAtomicNum())
+
+print(type(oe_smiles))

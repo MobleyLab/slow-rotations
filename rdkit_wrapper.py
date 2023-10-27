@@ -2,10 +2,10 @@
 
 from utils import NotImplementedError
 from rdkit import Chem
-from rdkit.Chem import AllChem
+from rdkit.Chem import AllChem, Draw
 from openff.toolkit import Molecule
 
-def load_rdmol_from_file(molfile: str):
+def load_rdmol_from_file(molfile: str, removeHs=False):
 	''' molfile: sdf file or mol2 file representing bond order
 				 in the trajectory
 
@@ -18,7 +18,7 @@ def load_rdmol_from_file(molfile: str):
 		rdmol = offmol.to_rdkit()
 
 	elif  molfile.endswith(".pdb"):
-		rdmol = Chem.MolFromPDBFile(molfile, removeHs=False)
+		rdmol = Chem.MolFromPDBFile(molfile, removeHs=removeHs)
 
 	else:
 		raise NotImplementedError
@@ -47,8 +47,34 @@ def sanitize_rdmol(mol):
 	Chem.SetAromaticity(mol, Chem.AromaticityModel.AROMATICITY_MDL)
 	return mol
 
-	
+def get_mapped_heavy_atom_indices(mol, mapped_atoms):
+    mapped_heavy_atoms = []
+    for ai in mapped_atoms:
+        if mol.GetAtomWithIdx(ai).GetAtomicNum() > 1:
+            mapped_heavy_atoms.append(ai)
+    return mapped_heavy_atoms
+    
+    
+def get_mapped_bonds(mol, mapped_atoms):
+    hit_bonds = []
+    for bond in mol.GetBonds():
+        aid1 = bond.GetBeginAtomIdx()
+        aid2 = bond.GetEndAtomIdx()
+        if aid1 in mapped_atoms and aid2 in mapped_atoms:
+            hit_bonds.append(mol.GetBondBetweenAtoms(aid1,aid2).GetIdx())
+    return hit_bonds
 
 
+def highlight_dihedral(mol, dihedral, save_path=None):   
+    AllChem.Compute2DCoords(mol)
+        
+    highlightAtoms = get_mapped_heavy_atom_indices(mol, dihedral)
+    highlightBonds = get_mapped_bonds(mol, dihedral)
 
-	
+    Draw.MolToImageFile(
+        mol,
+        save_path,
+        highlightBonds=highlightBonds,
+        highlightAtoms=highlightAtoms,
+        size=(1000, 1000)
+    )

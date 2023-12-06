@@ -10,3 +10,8 @@ def get_oemol_from_rdmol(rdmol):
 	off_rdmol = Molecule.from_rdkit(rdmol)
 	return Molecule.to_openeye(off_rdmol)
 
+def get_rdmol_from_oemol(oemol):
+	off_oemol = Molecule.from_rdkit(oemol)
+	return Molecule.to_openeye(off_oemol)
+	
+

@@ -33,8 +33,14 @@ def assign_bond_order_from_smiles(smiles: str, molfile: str):
 
 	# need to check to make sure I do actually need this
 	lig_mol_wo_bond_orders = load_rdmol_from_file(molfile)
+
 	smi_mol = Chem.MolFromSmiles(smiles)
-	smi_mol = Chem.AddHs(smi_mol)
+
+	if smi_mol.GetNumAtoms() < lig_mol_wo_bond_orders.GetNumAtoms():
+		smi_mol = Chem.AddHs(smi_mol)
+
+		print(smi_mol.GetNumAtoms(), lig_mol_wo_bond_orders.GetNumAtoms())
+		Chem.MolToMolFile(smi_mol, "hello_smi.pdb")
 
 	lig_mol = AllChem.AssignBondOrdersFromTemplate(smi_mol, lig_mol_wo_bond_orders)
 	return lig_mol
@@ -65,7 +71,10 @@ def get_mapped_bonds(mol, mapped_atoms):
     return hit_bonds
 
 
-def highlight_dihedral(mol, dihedral, save_path=None):   
+def highlight_dihedral(mol, dihedral, save_path=None):  
+    mol = Chem.Mol(mol)
+    mol = Chem.RemoveHs(mol)
+
     AllChem.Compute2DCoords(mol)
         
     highlightAtoms = get_mapped_heavy_atom_indices(mol, dihedral)
@@ -76,5 +85,6 @@ def highlight_dihedral(mol, dihedral, save_path=None):
         save_path,
         highlightBonds=highlightBonds,
         highlightAtoms=highlightAtoms,
-        size=(1000, 1000)
+        size=(1000, 500),
+        wedgeBonds=True, kekulize=True, wedgeFontSize=0, wedgeLineWidth=0
     )

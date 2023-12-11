@@ -114,36 +114,62 @@ class TorsionFinder():
 				shifted_angles[i] = shifted_angles[i] + 360
 		return angle_min, shifted_angles
 
+
+	def add_0_to_kde(self, X, score):
+
+		score = np.array(score) - np.min(np.array(score))
+		new_X = [X[0]]
+		new_score = [score[0]]
+
+		prev = X[0]
+		for i in range(1, len(X)):
+			if X[i] - X[i-1] > 10:
+				for newx in range(int(X[i-1]), int(X[i])):
+					new_X.append(newx)
+					new_score.append(0)
+
+			
+			new_X.append(X[i])
+			new_score.append(score[i])
+
+		return new_X, new_score
+
+
 	def get_kde(self, torsion, num_bins=40, angle_min=None):
 
 		angle_min, X = self.shift_torsion_angles(torsion, num_bins=num_bins, angle_min=angle_min)
+
+		if torsion[0] == 335 and torsion[3] == 338:
+			with open("/Users/megosato/Desktop/angles.txt", 'w') as f:
+				for a in X.flatten():
+					f.write(f'{a}\n')
+
 		X = np.sort(X.flatten())
 		X = X.reshape(-1, 1)
 		kde = KernelDensity(kernel='gaussian', bandwidth=360/num_bins).fit(X)
+
 		score = kde.score_samples(X)
 
 
 		return X,score,angle_min
 
-	def get_kde_num_peaks(self, scores, smoothing_window=10, peak_prominence=0.0001, peak_dist=30):
+	def get_kde_num_peaks(self, X, scores, smoothing_window=30, peak_prominence=0.0001, peak_dist=30):
 		# was 50 and 0.008
 		# moving average kde scores
+		peak_prominence=0.05 
 
-		smoothing_window=1
-
-		peak_prominence=0.001
+		new_x, new_score = self.add_0_to_kde(X, scores)
 
 
 		moving_avg = []
-		for i in range(len(scores) - smoothing_window):
-			moving_avg.append(np.mean(scores[i:i+smoothing_window]))
+		for i in range(len(new_score) - smoothing_window):
+			moving_avg.append(np.mean(new_score[i:i+smoothing_window]))
 
 		# peaks from moving average
-		peak_info = find_peaks(scores, prominence=peak_prominence, distance=peak_dist)
-		print(peak_info)
+		peak_info = find_peaks(new_score, prominence=peak_prominence, distance=peak_dist)
 		peaks = peak_info[0]
 
-		peaks = [p+int(0.5*smoothing_window) for p in peaks]
+		peaks = [new_x[p]+0.25*smoothing_window for p in peaks]
 
 		num_peaks = len(peaks)
 
@@ -163,53 +189,67 @@ class TorsionFinder():
 
 
 
-	def get_bounds_mindist(self, X, num_components, peaks, tolerance=20):
+	def get_bounds_mindist(self, X, scores, num_components, peaks, tolerance=20):
 
 		angles = X[:,0]
+
+		angles, scores = self.add_0_to_kde(X, scores)
 
 		cluster_labels = []
 
 		n_clusters = len(peaks)
 
-		peaks = [angles[p] for p in peaks]
+		new_angles = []
+	
+		# if the kde score is 0, we don't want stop the inclusion
+		for i,a in enumerate(angles):
+			if scores[i] == 0:
+				continue
 
-		print("angle peaks:", peaks)
-
-		for a in angles:
-			cluster_labels.append(self.get_closest_peak(a, peaks))
+			else:
+				cluster_labels.append(self.get_closest_peak(a, peaks))
+				new_angles.append(a)
 
 		min_max = []
 
 		for c in range(n_clusters):
 			center = peaks[c]
 
+			print("CENTER:", center)
+
 			centroid_index = None
 			centroid_min_diff = 999999999
-			for i,a in enumerate(angles):
+			for i,a in enumerate(new_angles):
 				diff = abs(center - a)
 				if diff < centroid_min_diff:
 					centroid_min_diff = diff
 					centroid_index = i
+
+			print("CENTER_ANGLE:", new_angles[centroid_index])
+			print("CENTER_DIFF:", centroid_min_diff)
 			
 			min_i = 0
-			max_i = len(angles) - 1
-			i = centroid_index
-			while i > 0:
-				if abs(angles[i] - angles[i-1]) > tolerance or cluster_labels[i] != c:
-					min_i = i
+			max_i = len(new_angles) - 1
+			idx = centroid_index
+
+			while idx > 0:
+				if abs(new_angles[idx] - new_angles[idx-1]) > tolerance or cluster_labels[idx] != c:
+					min_i = idx
 					break
-				i -= 1
+				idx -= 1
 			
-			for i in range(centroid_index,len(angles) - 1):
-				if abs(angles[i+1] - angles[i]) > tolerance or cluster_labels[i] != c:
-					max_i = i - 1
+			print("CENTROID_INDEX:", centroid_index)
+			print("NEW ANGLES LEN:", len(new_angles))
+			for idx in range(centroid_index,len(new_angles) - 1):
+				if abs(new_angles[idx+1] - new_angles[idx]) > tolerance or cluster_labels[idx] != c:
+					max_i = idx - 1
 					break
 					
-			min_max.append((angles[min_i],angles[max_i]))
+			min_max.append((new_angles[min_i],new_angles[max_i]))
 		return min_max
 
 
-	def get_bounds_knn(self, X, num_components, peaks, tolerance=10):
+	def get_bounds_knn(self, X, num_components, peaks, tolerance=20):
 
 		init_centers = [[p,0] for p in peaks]
 
@@ -353,7 +393,9 @@ class TorsionFinder():
 	def highlight_dihedral(self, dihedral, save_path=None):
 		pass
 
-	def plot_dihedral_scatter(self, torsion, title=None, show=True, save_path=None):
+	def plot_dihedral_scatter(self, torsion, title=None, show=False
+
+		, save_path=None):
 		f, ax = plt.subplots()
 		X = self.get_torsion_angles(torsion)
 		ax.scatter(np.arange(len(X)), X)
@@ -377,16 +419,18 @@ class TorsionFinder():
 
 		X, score, angle_min = self.get_kde(torsion, num_bins=40, angle_min=None)
 
+		new_X, new_score = X,score#self.add_0_to_kde(X, score)
+
 		print('BND ANGLE MIN PLT:', angle_min)
 
 		if smoothing_window != -1:
 			moving_avg = []
-			for i in range(len(score) - smoothing_window):
-				moving_avg.append(np.mean(score[i:i+smoothing_window]))
-			score = moving_avg
-			X = np.arange(angle_min, angle_min+360, 360/len(score))
+			for i in range(len(new_score) - smoothing_window):
+				moving_avg.append(np.mean(new_score[i:i+smoothing_window]))
+			new_score = moving_avg
+			new_X = np.arange(angle_min, angle_min+360, 360/len(new_score))
 
-		ax.plot(X,score)
+		ax.plot(new_X,new_score)
 		if save_path:
 			plt.savefig(save_path, dpi=500)
 
@@ -455,6 +499,7 @@ class TorsionFinder():
 		ax.axis('off')
 
 	def make_torsion_img(self, torsion, angle_min=None, show=False, save_path=None):
+		print("in torsionfinder make_torsion_img")
 
 		d1,d2,d3,d4 = tuple(torsion)
 
@@ -470,9 +515,9 @@ class TorsionFinder():
 		X, scores, angle_min = self.get_kde(torsion, angle_min=angle_min)
 
 
-		num_peaks, peaks = self.get_kde_num_peaks(scores, smoothing_window=100, peak_prominence=0.008)
+		num_peaks, peaks = self.get_kde_num_peaks(X, scores, smoothing_window=100, peak_prominence=0.008)
 		
-		min_max = self.get_bounds_knn(X, num_peaks, peaks)
+		min_max = self.get_bounds_mindist(X, scores, num_peaks, peaks)
 
 		angles = self.shift_torsion_angles(torsion, angle_min=angle_min)[1].flatten()
 
@@ -480,6 +525,7 @@ class TorsionFinder():
 
 		pdf_individual = []
 		for mm in min_max:
+			print(mm)
 			gmm,x,pdf,pdfi,bounds = self.get_individual_gmm(X, angle_min, mm)
 			pdf_individual.append(pdfi)
 
@@ -849,6 +895,7 @@ class LigandTorsionFinder(TorsionFinder):
 		'''
 		rdw.highlight_dihedral(self.rdmol, dihedral, save_path)
 
+
 	def make_torsion_img(self, torsion, angle_min=None, show=False, save_path=None):
 
 		d1,d2,d3,d4 = tuple(torsion)
@@ -867,9 +914,12 @@ class LigandTorsionFinder(TorsionFinder):
 		X, scores, angle_min = self.get_kde(torsion_sys, angle_min=angle_min)
 
 
-		num_peaks, peaks = self.get_kde_num_peaks(scores, smoothing_window=100, peak_prominence=0.008)
+		num_peaks, peaks = self.get_kde_num_peaks(X, scores, smoothing_window=30, peak_prominence=0.01)
+
+		print("PEAKS:", peaks)
 		
-		min_max = self.get_bounds_mindist(X, num_peaks, peaks)
+		min_max = self.get_bounds_mindist(X, scores, num_peaks, peaks)
+		print("min_max:", min_max)
 
 		angles = self.shift_torsion_angles(torsion_sys, angle_min=angle_min)[1].flatten()
 
@@ -888,7 +938,7 @@ class LigandTorsionFinder(TorsionFinder):
 
 		states_list = [f"s{i}" for i in range(num_peaks)]
 
-		self.plot_dihedral_histogram(torsion_sys, ax=ax[1], show=False, pdf_individual=pdf_individual, angles=angles, angle_min=angle_min)
+		self.plot_dihedral_histogram(torsion_sys, ax=ax[1], show=False,  angles=angles, angle_min=angle_min, pdf_individual=pdf_individual,)
 		ax[1].legend(states_list)
 		pdf_colors = ['red', 'orange', 'green', 'blue', 'purple', 'brown']
 		self.plot_transition_counts(transition_ctr, ax=ax[2], colors=pdf_colors)

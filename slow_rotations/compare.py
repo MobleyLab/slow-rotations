@@ -197,7 +197,7 @@ class LigandComparator():
         b1,b2,b3,b4 = tuple(bnd_tor)
 
         sup_title = f"Solvent Ligand vs. Bound Ligand"
-        gas_title = f"Solvent Ligand ({g1},{g2},{g3},{g4}) "
+        gas_title = f"Solventv Ligand ({g1},{g2},{g3},{g4}) "
         bnd_title = f"Bound Ligand ({b1},{b2},{b3},{b4})"
 
         f,ax = plt.subplots(2, 3, figsize=(18, 9))
@@ -230,8 +230,7 @@ class LigandComparator():
         self.gas_ltf.plot_transition_counts(bnd_transition, ax=ax[1,2], colors=pdf_colors)
 
 
-        
-
+    
         # ax[0,2].axis('off')
         # ax[1,2].axis('off')
 

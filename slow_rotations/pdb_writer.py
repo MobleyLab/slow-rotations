@@ -1,5 +1,5 @@
 import parmed as pmd
-
+import tempfile
 SYMBOL_TO_ATMNUM = {'H': 1, 'He': 2, 'Li': 3, 'Be': 4, 'B': 5, 'C': 6, 'N': 7, 'O': 8, 'F': 9, 'Ne': 10,
                         'Na': 11, 'Mg': 12, 'Al': 13, 'Si': 14, 'P': 15, 'S': 16, 'Cl': 17, 'K': 19, 'Ar': 18,
                         'Ca': 20, 'Sc': 21, 'Ti': 22, 'V': 23, 'Cr': 24, 'Mn': 25, 'Fe': 26, 'Ni': 28, 'Co': 27,
@@ -52,5 +52,18 @@ def make_standard_atmname(pmd_struct):
 def rename_lig_pdb_atoms(ilig_pdb: str, olig_pdb: str):
 	lig_struct = pmd.load_file(ilig_pdb)
 	nox_lig_struct = make_standard_atmname(lig_struct)
-	nox_lig_struct.save(olig_pdb, overwrite=True)
+
+	pdb_correct_atype = tempfile.NamedTemporaryFile(suffix='.pdb', delete=False)
+
+	nox_lig_struct.save(pdb_correct_atype.name, overwrite=True)
+
+	with open(ilig_pdb, 'r') as i:
+		with open(pdb_correct_atype.name, 'r') as intermed:
+			with open(olig_pdb, 'w') as o:
+				for line in intermed:
+					if not line.startswith("END"):
+						o.write(line)
+				for line in i:
+					if line.startswith('CONECT'):
+						o.write(line)
 

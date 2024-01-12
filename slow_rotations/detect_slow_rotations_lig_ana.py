@@ -8,7 +8,7 @@ from pathlib import Path
 
 from scipy.special import kl_div
 
-base_path = Path('/Users/megosato/Desktop/simulations/hif2a/')
+base_path = Path('/Users/megosato/Library/Mobile Documents/com~apple~CloudDocs/Desktop/simulations/hif2a/')
 
 
 

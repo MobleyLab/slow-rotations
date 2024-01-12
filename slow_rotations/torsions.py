@@ -29,6 +29,9 @@ import molconverter as mc
 class BadTorsionError():
 	pass
 
+class BadTopologyError():
+	pass
+
 class TransitionCounter():
 	def __init__(self, num_states):
 		self.transition_dict = dict()
@@ -499,8 +502,6 @@ class TorsionFinder():
 		ax.axis('off')
 
 	def make_torsion_img(self, torsion, angle_min=None, show=False, save_path=None):
-		print("in torsionfinder make_torsion_img")
-
 		d1,d2,d3,d4 = tuple(torsion)
 
 		sel_a_in_dih = self.mda_universe.select_atoms(f"index {torsion[0]}")
@@ -769,7 +770,7 @@ class LigandTorsionFinder(TorsionFinder):
 			in 2 representations of same molecule
 	'''
 	def __init__(self, trajf: str, topf: str, ligcode: str, smiles: str, complex=False, molfile=None):
-		''' molfile: with atom numbering that is equivalent to the trajectory mol atom numbering
+		''' topf:	a pdb file with atom conect information 
 		'''
 
 		TorsionFinder.__init__(self, trajf, topf)
@@ -778,31 +779,48 @@ class LigandTorsionFinder(TorsionFinder):
 		self.molfile = molfile
 		self.ligcode = ligcode
 
+		if not self.check_top_has_conect(self.topf):
+			raise BadTopologyError
+
+
 		pdb_incorrect_atype = tempfile.NamedTemporaryFile(suffix='.pdb', delete=False)
 		pdb_fixed_atype = tempfile.NamedTemporaryFile(suffix='.pdb', delete=False)
 		selection = f"resname {ligcode}"
 
 		self.export_pdb_from_traj(pdb_incorrect_atype.name, sel=selection)
-
-		pdbw.rename_lig_pdb_atoms(pdb_incorrect_atype.name, "hello.pdb")#pdb_fixed_atype.name)
-
+		pdbw.rename_lig_pdb_atoms(pdb_incorrect_atype.name, pdb_fixed_atype.name)
 
 		# begin old:
-		self.rdmol = rdw.assign_bond_order_from_smiles(smiles, "hello.pdb")#pdb_fixed_atype.name)
+		self.rdmol = rdw.assign_bond_order_from_smiles(smiles, pdb_fixed_atype.name)
 		self.rdmol = rdw.sanitize_rdmol(self.rdmol)
 		self.oemol = mc.get_oemol_from_rdmol(self.rdmol)
 		# end old
 
-		# self.rdmol = mappings.reindex_smiles_from_pdb(smiles, "hello.pdb")
-		# self.rdmol = rdw.sanitize_rdmol(self.rdmol)
-
-		# from rdkit import Chem
-		# Chem.MolToPDBFile(self.rdmol, "hello_rdmol.pdb")
-		# self.oemol = mc.get_oemol_from_rdmol(self.rdmol)
-
-
 		os.unlink(pdb_fixed_atype.name)
 		os.unlink(pdb_incorrect_atype.name)
+
+	def check_top_has_conect(self, topf):
+		if not topf.endswith(".pdb"):
+			return False
+
+		seen_lig_conect = False
+
+		selection = f"resname {self.ligcode}"
+
+		ags = self.mda_universe.select_atoms(selection)
+		indices = [ a.index for a in ags ]
+
+		with open(topf, 'r') as t:
+			for line in t:
+				if line.strip() == "END":
+					return False
+
+				if line.startswith("CONECT"):
+					if int(line[6:11]) in indices:
+						return True
+		return False
+
+
 
 	def get_oemol(self):
 		return self.oemol
@@ -823,7 +841,7 @@ class LigandTorsionFinder(TorsionFinder):
 
 	def export_pdb_from_traj(self, opdb, sel="all"):
 		atms = self.mda_universe.select_atoms(sel)
-		atms.write(opdb, frames=self.mda_universe.trajectory[[-1,]])
+		atms.write(opdb, frames=self.mda_universe.trajectory[[-1,]], bonds='conect')
 
 
 	def _get_torsion(self, bond):

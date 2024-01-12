@@ -2,7 +2,7 @@
 
 from utils import NotImplementedError
 from rdkit import Chem
-from rdkit.Chem import AllChem, Draw
+from rdkit.Chem import AllChem, Draw, rdFMCS
 from openff.toolkit import Molecule
 
 def load_rdmol_from_file(molfile: str, removeHs=False):
@@ -18,7 +18,7 @@ def load_rdmol_from_file(molfile: str, removeHs=False):
 		rdmol = offmol.to_rdkit()
 
 	elif  molfile.endswith(".pdb"):
-		rdmol = Chem.MolFromPDBFile(molfile, removeHs=removeHs)
+		rdmol = Chem.MolFromPDBFile(molfile, removeHs=removeHs, proximityBonding=False)
 
 	else:
 		raise NotImplementedError
@@ -36,11 +36,14 @@ def assign_bond_order_from_smiles(smiles: str, molfile: str):
 
 	smi_mol = Chem.MolFromSmiles(smiles)
 
+	print(smiles)
+
 	if smi_mol.GetNumAtoms() < lig_mol_wo_bond_orders.GetNumAtoms():
 		smi_mol = Chem.AddHs(smi_mol)
+		Chem.MolToMolFile(smi_mol, "hello_smi.mol")
+		sanitize_rdmol(smi_mol)
+		sanitize_rdmol(lig_mol_wo_bond_orders)
 
-		print(smi_mol.GetNumAtoms(), lig_mol_wo_bond_orders.GetNumAtoms())
-		Chem.MolToMolFile(smi_mol, "hello_smi.pdb")
 
 	lig_mol = AllChem.AssignBondOrdersFromTemplate(smi_mol, lig_mol_wo_bond_orders)
 	return lig_mol
@@ -73,15 +76,26 @@ def get_mapped_bonds(mol, mapped_atoms):
 
 def highlight_dihedral(mol, dihedral, save_path=None):  
     mol = Chem.Mol(mol)
-    mol = Chem.RemoveHs(mol)
+    mol_wo_H = Chem.RemoveHs(mol)
 
-    AllChem.Compute2DCoords(mol)
+    mcs = rdFMCS.FindMCS([mol, mol_wo_H])
+    patt = Chem.MolFromSmarts(mcs.smartsString)
+
+    query_match = mol.GetSubstructMatch(patt)
+    template_match = mol_wo_H.GetSubstructMatch(patt)
+
+    index_convert = {query_match[i]: template_match[i] for i in range(len(query_match))}
+
+    new_dihedral = [ index_convert[aid] for aid in dihedral]
+
+
+    AllChem.Compute2DCoords(mol_wo_H)
         
-    highlightAtoms = get_mapped_heavy_atom_indices(mol, dihedral)
-    highlightBonds = get_mapped_bonds(mol, dihedral)
+    highlightAtoms = get_mapped_heavy_atom_indices(mol_wo_H, new_dihedral)
+    highlightBonds = get_mapped_bonds(mol_wo_H, new_dihedral)
 
     Draw.MolToImageFile(
-        mol,
+        mol_wo_H,
         save_path,
         highlightBonds=highlightBonds,
         highlightAtoms=highlightAtoms,

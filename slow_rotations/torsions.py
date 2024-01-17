@@ -18,6 +18,7 @@ from sklearn.mixture import GaussianMixture
 from scipy.signal import find_peaks
 from sklearn.neighbors import KernelDensity
 from sklearn.cluster import KMeans
+from rdkit import Chem
 
 import utils
 import mappings
@@ -161,7 +162,7 @@ class TorsionFinder():
 		# moving average kde scores
 		peak_prominence=0.05 
 
-		new_x, new_score = self.add_0_to_kde(X, scores)
+		new_x, new_score = X, scores #self.add_0_to_kde(X, scores)
 
 
 		moving_avg = []
@@ -218,8 +219,6 @@ class TorsionFinder():
 		for c in range(n_clusters):
 			center = peaks[c]
 
-			print("CENTER:", center)
-
 			centroid_index = None
 			centroid_min_diff = 999999999
 			for i,a in enumerate(new_angles):
@@ -227,10 +226,6 @@ class TorsionFinder():
 				if diff < centroid_min_diff:
 					centroid_min_diff = diff
 					centroid_index = i
-
-			print("CENTER_ANGLE:", new_angles[centroid_index])
-			print("CENTER_DIFF:", centroid_min_diff)
-			
 			min_i = 0
 			max_i = len(new_angles) - 1
 			idx = centroid_index
@@ -240,9 +235,7 @@ class TorsionFinder():
 					min_i = idx
 					break
 				idx -= 1
-			
-			print("CENTROID_INDEX:", centroid_index)
-			print("NEW ANGLES LEN:", len(new_angles))
+
 			for idx in range(centroid_index,len(new_angles) - 1):
 				if abs(new_angles[idx+1] - new_angles[idx]) > tolerance or cluster_labels[idx] != c:
 					max_i = idx - 1
@@ -424,8 +417,6 @@ class TorsionFinder():
 
 		new_X, new_score = X,score#self.add_0_to_kde(X, score)
 
-		print('BND ANGLE MIN PLT:', angle_min)
-
 		if smoothing_window != -1:
 			moving_avg = []
 			for i in range(len(new_score) - smoothing_window):
@@ -441,15 +432,14 @@ class TorsionFinder():
 		if not ax:
 			f, ax = plt.subplots()
 
-		if angle_min == None:
-			angle_min, angles = self.shift_torsion_angles(torsion, num_bins, angle_min=angle_min)
+		angle_min, angles = self.shift_torsion_angles(torsion, num_bins, angle_min=angle_min)
 
 		X = np.array(angles).flatten()
 		kwargs = dict()
 		if color != None:
 			kwargs['color']=color
 		ax.hist(X, bins=num_bins, range=(angle_min,angle_min+360), alpha=alpha, density=True, stacked=True, **kwargs)
-		ax.set_xlim([angle_min, angle_min+360])
+		ax.set_xticks(np.arange(angle_min, angle_min+361, 30))
 		ax.set_xlabel("Dihedral Angle (˚)")
 		ax.set_ylabel("Frequency")
 
@@ -526,7 +516,6 @@ class TorsionFinder():
 
 		pdf_individual = []
 		for mm in min_max:
-			print(mm)
 			gmm,x,pdf,pdfi,bounds = self.get_individual_gmm(X, angle_min, mm)
 			pdf_individual.append(pdfi)
 
@@ -779,8 +768,8 @@ class LigandTorsionFinder(TorsionFinder):
 		self.molfile = molfile
 		self.ligcode = ligcode
 
-		if not self.check_top_has_conect(self.topf):
-			raise BadTopologyError
+		#if not self.check_top_has_conect(self.topf):
+		#	raise BadTopologyError
 
 
 		pdb_incorrect_atype = tempfile.NamedTemporaryFile(suffix='.pdb', delete=False)
@@ -791,8 +780,8 @@ class LigandTorsionFinder(TorsionFinder):
 		pdbw.rename_lig_pdb_atoms(pdb_incorrect_atype.name, pdb_fixed_atype.name)
 
 		# begin old:
-		self.rdmol = rdw.assign_bond_order_from_smiles(smiles, pdb_fixed_atype.name)
-		self.rdmol = rdw.sanitize_rdmol(self.rdmol)
+		self.rdmol_unsanitized = rdw.assign_bond_order_from_smiles(smiles, pdb_fixed_atype.name)
+		self.rdmol = rdw.sanitize_rdmol(Chem.Mol(self.rdmol_unsanitized))
 		self.oemol = mc.get_oemol_from_rdmol(self.rdmol)
 		# end old
 
@@ -814,13 +803,10 @@ class LigandTorsionFinder(TorsionFinder):
 			for line in t:
 				if line.strip() == "END":
 					return False
-
 				if line.startswith("CONECT"):
 					if int(line[6:11]) in indices:
 						return True
 		return False
-
-
 
 	def get_oemol(self):
 		return self.oemol
@@ -911,7 +897,7 @@ class LigandTorsionFinder(TorsionFinder):
 			  without Hs
 			* compares the 2 to get atom orderings via MCS
 		'''
-		rdw.highlight_dihedral(self.rdmol, dihedral, save_path)
+		rdw.highlight_dihedral(self.rdmol_unsanitized, dihedral, save_path)
 
 
 	def make_torsion_img(self, torsion, angle_min=None, show=False, save_path=None):
@@ -931,13 +917,10 @@ class LigandTorsionFinder(TorsionFinder):
 
 		X, scores, angle_min = self.get_kde(torsion_sys, angle_min=angle_min)
 
-
 		num_peaks, peaks = self.get_kde_num_peaks(X, scores, smoothing_window=30, peak_prominence=0.01)
 
-		print("PEAKS:", peaks)
 		
 		min_max = self.get_bounds_mindist(X, scores, num_peaks, peaks)
-		print("min_max:", min_max)
 
 		angles = self.shift_torsion_angles(torsion_sys, angle_min=angle_min)[1].flatten()
 

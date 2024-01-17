@@ -109,7 +109,6 @@ class LigandComparator():
 
         gas_pdf_individual = []
         for min_max in gas_min_max:
-            print("MM:", min_max)
             gmm,x,pdf,pdf_individual,bounds = self.gas_ltf.get_individual_gmm(gas_X, gas_angle_min, min_max)
             gas_pdf_individual.append(pdf_individual)
 
@@ -119,7 +118,6 @@ class LigandComparator():
 
         bnd_X, bnd_scores, bnd_angle_min = self.bnd_ltf.get_kde(bnd_tor)
 
-        print('BND ANGLE MIN:', bnd_angle_min)
         bnd_angles = self.bnd_ltf.shift_torsion_angles(bnd_tor,angle_min=bnd_angle_min)[1].flatten()
         bnd_num_peaks, bnd_peaks = self.bnd_ltf.get_kde_num_peaks(bnd_scores)
         bnd_min_max = self.bnd_ltf.get_bounds_mindist(bnd_X, bnd_num_peaks, bnd_peaks)
@@ -127,7 +125,6 @@ class LigandComparator():
 
         bnd_pdf_individual = []
         for min_max in bnd_min_max:
-            print("MM:", min_max)
             gmm,x,pdf,pdf_individual,bounds = self.bnd_ltf.get_individual_gmm(bnd_X, bnd_angle_min, min_max)
             bnd_pdf_individual.append(pdf_individual)
 

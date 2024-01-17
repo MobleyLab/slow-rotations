@@ -18,7 +18,7 @@ def load_rdmol_from_file(molfile: str, removeHs=False):
 		rdmol = offmol.to_rdkit()
 
 	elif  molfile.endswith(".pdb"):
-		rdmol = Chem.MolFromPDBFile(molfile, removeHs=removeHs, proximityBonding=False)
+		rdmol = Chem.MolFromPDBFile(molfile, removeHs=removeHs)#, proximityBonding=False)
 
 	else:
 		raise NotImplementedError
@@ -36,14 +36,11 @@ def assign_bond_order_from_smiles(smiles: str, molfile: str):
 
 	smi_mol = Chem.MolFromSmiles(smiles)
 
-	print(smiles)
-
 	if smi_mol.GetNumAtoms() < lig_mol_wo_bond_orders.GetNumAtoms():
 		smi_mol = Chem.AddHs(smi_mol)
 		Chem.MolToMolFile(smi_mol, "hello_smi.mol")
 		sanitize_rdmol(smi_mol)
 		sanitize_rdmol(lig_mol_wo_bond_orders)
-
 
 	lig_mol = AllChem.AssignBondOrdersFromTemplate(smi_mol, lig_mol_wo_bond_orders)
 	return lig_mol
@@ -86,8 +83,7 @@ def highlight_dihedral(mol, dihedral, save_path=None):
 
     index_convert = {query_match[i]: template_match[i] for i in range(len(query_match))}
 
-    new_dihedral = [ index_convert[aid] for aid in dihedral]
-
+    new_dihedral = [ index_convert[aid] for aid in dihedral ]
 
     AllChem.Compute2DCoords(mol_wo_H)
         
@@ -102,3 +98,22 @@ def highlight_dihedral(mol, dihedral, save_path=None):
         size=(1000, 500),
         wedgeBonds=True, kekulize=True, wedgeFontSize=0, wedgeLineWidth=0
     )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

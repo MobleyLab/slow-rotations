@@ -19,12 +19,14 @@ from scipy.signal import find_peaks
 from sklearn.neighbors import KernelDensity
 from sklearn.cluster import KMeans
 from rdkit import Chem
+from pymbar import timeseries
 
 import utils
 import mappings
 import rdkit_wrapper as rdw
 import pdb_writer as pdbw
 import molconverter as mc
+import transitions
 
 
 class BadTorsionError():
@@ -33,23 +35,7 @@ class BadTorsionError():
 class BadTopologyError():
 	pass
 
-class TransitionCounter():
-	def __init__(self, num_states):
-		self.transition_dict = dict()
-		for s in range(num_states):
-			self.transition_dict[s] = {"in": 0, "out": 0}
 
-	def increment_out(self, state):
-		self.transition_dict[state]["out"] += 1
-
-	def increment_in(self, state):
-		self.transition_dict[state]["in"] += 1
-
-	def to_dict(self):
-		return self.transition_dict
-
-	def to_pandas(self):
-		return pd.DataFrame.from_dict(self.transition_dict).transpose()
 
 class TorsionFinder():
 
@@ -139,6 +125,15 @@ class TorsionFinder():
 		return new_X, new_score
 
 
+	def get_statistical_inefficiency(self, torsion, num_bins=40, angle_min=None):
+
+		angle_min, X = self.shift_torsion_angles(torsion, num_bins=num_bins, angle_min=angle_min)
+
+		g = timeseries.statisticalInefficiency(X.flatten())
+
+		return g
+
+
 	def get_kde(self, torsion, num_bins=40, angle_min=None):
 
 		angle_min, X = self.shift_torsion_angles(torsion, num_bins=num_bins, angle_min=angle_min)
@@ -193,7 +188,7 @@ class TorsionFinder():
 
 
 
-	def get_bounds_mindist(self, X, scores, num_components, peaks, tolerance=20):
+	def get_bounds_mindist(self, X, scores, num_components, peaks, tolerance=50):
 
 		angles = X[:,0]
 
@@ -245,7 +240,7 @@ class TorsionFinder():
 		return min_max
 
 
-	def get_bounds_knn(self, X, num_components, peaks, tolerance=20):
+	def get_bounds_knn(self, X, num_components, peaks, tolerance=30):
 
 		init_centers = [[p,0] for p in peaks]
 
@@ -355,7 +350,7 @@ class TorsionFinder():
 				which_state.append(-1)
 
 
-		transition_ctr = TransitionCounter(num_states)
+		transition_ctr = transitions.TransitionCounter(num_states)
 		for i in range(1, len(which_state)):
 
 			if which_state[i] != which_state[i-1]:
@@ -369,6 +364,32 @@ class TorsionFinder():
 					transition_ctr.increment_in(which_state[i])
 
 		return transition_ctr
+
+
+
+	def transition_matrix(self, angles, range_of_states):
+
+		num_states = len(range_of_states)
+
+		which_state = []
+		for num in angles:
+			categorized = False
+			for i in range(0, num_states):
+				if range_of_states[i][0] <= num <= range_of_states[i][1]:
+					which_state.append(i)
+					categorized = True
+			if not categorized:
+				which_state.append(-1)
+
+		transition_ctr = transitions.TransitionMatrixCounter(num_states)
+		for i in range(1, len(which_state)):
+			if which_state[i] != which_state[i-1]:
+				# left which_state[i-1]
+				# entered which_state[i]
+				transition_ctr.increment_transition(which_state[i-1], which_state[i])
+
+		return transition_ctr
+
 
 	def check_transitions(self, transition_counter, min_transitions):
 		raise utils.NotImplementedError
@@ -439,8 +460,8 @@ class TorsionFinder():
 		if color != None:
 			kwargs['color']=color
 		ax.hist(X, bins=num_bins, range=(angle_min,angle_min+360), alpha=alpha, density=True, stacked=True, **kwargs)
-		ax.set_xticks(np.arange(angle_min, angle_min+361, 30))
-		ax.set_xlabel("Dihedral Angle (˚)")
+		ax.set_xticks(np.arange(round(angle_min,-1), round(angle_min, -1)+361, 30))
+		ax.set_xlabel(f"Dihedral Angle (˚) shifted by {int(angle_min) - (-180)}˚ to right")
 		ax.set_ylabel("Frequency")
 
 		pdf_individual_sort = sorted(pdf_individual, key=len)
@@ -457,6 +478,7 @@ class TorsionFinder():
 		if save_path:
 			plt.savefig(save_path, dpi=500)
 
+
 	def plot_transition_counts(self, transition_ctr, ax=None, colors=[]):
 
 		if not ax:
@@ -468,12 +490,12 @@ class TorsionFinder():
 
 		table = ax.table(
 			cellText=df.values, 
-			colLabels=[f"transitions {d}" for d in df.columns], 
-			rowLabels=[f" s{i} " for i in range(len(df))],
+			colLabels=[f"s{d} in" for d in df.columns], 
+			rowLabels=[f"s{d} out" for d in df.index],
 			loc='center',
 		)
 		table.auto_set_font_size(False)
-		table.scale(0.98, 3)
+		table.scale(0.93, 3)
 
 		for (row, col), cell in table.get_celld().items():
 			if (row == 0) or (col == -1):
@@ -482,12 +504,20 @@ class TorsionFinder():
 				cell.set_text_props(ha="center", fontsize=18)
 
 			alpha_value = 0.5
-			if len(colors) > len(df) and col == -1:
+			if len(colors) >= len(df) and col == -1:
 				cell.set_facecolor(colors[row-1])
 				cell.set_alpha(alpha_value)
 
-			if row == 0:
-				cell.set_facecolor('lightgrey')
+
+			if len(colors) >= len(df) and row == 0:
+				cell.set_facecolor(colors[col])
+				cell.set_alpha(alpha_value)
+
+			if (row == len(df) and col == -1) or (col == len(df)-1 and row == 0):
+			 	cell.set_facecolor('lightgrey')
+
+			if row == col + 1:
+			 	cell.set_facecolor('lightgrey')
 
 		ax.axis('off')
 
@@ -529,7 +559,7 @@ class TorsionFinder():
 
 		self.plot_dihedral_histogram(torsion, ax=ax[1], show=False, pdf_individual=pdf_individual, angles=angles, angle_min=angle_min)
 		ax[1].legend(states_list)
-		pdf_colors = ['red', 'orange', 'green', 'blue', 'purple', 'brown']
+		pdf_colors = ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'brown']
 		self.plot_transition_counts(transition_ctr, ax=ax[2], colors=pdf_colors)
 
 		if show:
@@ -746,6 +776,8 @@ class ProteinTorsionFinder(TorsionFinder):
 		sel_atm_in_dih = self.mda_universe.select_atoms(f"index {torsion[0]}")
 		return sel_atm_in_dih[0].residue
 
+
+
 	def determine_chi_x(self, torsion):
 		raise utils.NotImplementedError
 
@@ -889,7 +921,6 @@ class LigandTorsionFinder(TorsionFinder):
 			torsions.append(torsion)
 		return torsions
 
-
 	def highlight_dihedral(self, dihedral, save_path=None):
 		''' highlights the dihedral of a protein sidechain
 			* exports the protein residue as a single AA pdb
@@ -924,7 +955,7 @@ class LigandTorsionFinder(TorsionFinder):
 
 		angles = self.shift_torsion_angles(torsion_sys, angle_min=angle_min)[1].flatten()
 
-		transition_ctr = self.transition_counter(angles, min_max)
+		transition_ctr = self.transition_matrix(angles, min_max)
 
 		pdf_individual = []
 		for mm in min_max:
@@ -940,12 +971,26 @@ class LigandTorsionFinder(TorsionFinder):
 		states_list = [f"s{i}" for i in range(num_peaks)]
 
 		self.plot_dihedral_histogram(torsion_sys, ax=ax[1], show=False,  angles=angles, angle_min=angle_min, pdf_individual=pdf_individual,)
+
 		ax[1].legend(states_list)
+		g = self.get_statistical_inefficiency(torsion)
+		ax[1].set_title(f'statistical inefficiency, g = {round(g,2)}', fontsize=15, color='black')
+
+
 		pdf_colors = ['red', 'orange', 'green', 'blue', 'purple', 'brown']
 		self.plot_transition_counts(transition_ctr, ax=ax[2], colors=pdf_colors)
+
+		if mappings.check_symmetry(self.oemol, torsion):
+			# if there is symmetry add a note on the image
+			print("SYMMETRY")
+			ax[2].text(0.01, 0.01, f'** Warning: torsion has symmetry, disregard transitions', fontsize=15, color='red')
 
 		if show:
 			plt.show()
 		if save_path:
 			plt.savefig(save_path)
-		return angle_min
+		return min_max, transition_ctr, states_list
+
+
+
+

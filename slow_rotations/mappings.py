@@ -113,3 +113,30 @@ def map_mols(mol1, mol2):
 		raise utils.NotImplementedError
 
 	return mapping
+
+
+def check_symmetry(mol, torsion):
+    oechem.OEPerceiveSymmetry(mol)
+    cb_indices = [1,2]
+    for i,cb_aidx in enumerate(cb_indices):
+        cb_atm = get_atom_by_index(mol, torsion[cb_aidx])
+
+        nbr_ct = 0
+        symmetry_numbers = []
+
+        for nbr_atm in cb_atm.GetAtoms():
+            nbr_ct += 1
+            
+            if nbr_atm.GetIdx() == torsion[cb_indices[(i+1)% 2]]:
+                # it is the other atom in the central bond
+                # skip this atom
+                continue
+            symmetry_numbers.append(nbr_atm.GetSymmetryClass())
+            
+        if nbr_ct == 4 and len(set(symmetry_numbers)) == 1:
+            return True
+
+        elif nbr_ct == 3 and len(set(symmetry_numbers)) == 1:
+            return True
+
+    return False 

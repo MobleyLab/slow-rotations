@@ -931,6 +931,41 @@ class LigandTorsionFinder(TorsionFinder):
 		rdw.highlight_dihedral(self.rdmol_unsanitized, dihedral, save_path)
 
 
+	def make_torsion_img_no_shift(self, torsion, show=False, save_path=None):
+
+		angle_min = -180
+		# prevents shifting
+
+		d1,d2,d3,d4 = tuple(torsion)
+		torsion_sys = [self.convert_ligidx_to_sysidx(i) for i in torsion]
+		sel_a_in_dih = self.mda_universe.select_atoms(f"index {torsion_sys[0]}")
+		sel_resid = sel_a_in_dih[0].residue
+
+		f,ax = plt.subplots(1, 2, figsize=(12, 6.25))
+
+		sup_title = f"{sel_resid.resname} {sel_resid.resid} ({d1},{d2},{d3},{d4})"
+
+		f.suptitle(sup_title,fontsize=60)
+
+		f.tight_layout(pad=3.5)
+
+		with tempfile.NamedTemporaryFile(suffix='.png') as highlightpng:
+			self.highlight_dihedral(torsion, save_path=highlightpng)
+			img = np.asarray(Image.open(highlightpng.name))
+			ax[0].imshow(img)
+			ax[0].axis('off')
+
+		angles = self.shift_torsion_angles(torsion_sys, angle_min=angle_min)[1].flatten()
+
+		self.plot_dihedral_histogram(torsion_sys, ax=ax[1], show=False,  angles=angles, angle_min=angle_min)
+
+		if show:
+			plt.show()
+		if save_path:
+			plt.savefig(save_path)
+
+
+
 	def make_torsion_img(self, torsion, angle_min=None, show=False, save_path=None):
 
 		d1,d2,d3,d4 = tuple(torsion)

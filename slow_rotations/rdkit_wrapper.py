@@ -4,6 +4,7 @@ from utils import NotImplementedError
 from rdkit import Chem
 from rdkit.Chem import AllChem, Draw, rdFMCS
 from openff.toolkit import Molecule
+import numpy as np
 
 def load_rdmol_from_file(molfile: str, removeHs=False):
     ''' molfile: sdf file or mol2 file representing bond order
@@ -13,12 +14,45 @@ def load_rdmol_from_file(molfile: str, removeHs=False):
     '''
     # loads in molecule as openff Molecule object
     # returns molecule as an rdkit mol object
+
     if molfile.endswith(".sdf") or molfile.endswith(".mol2"):
         offmol = Molecule(molfile)
         rdmol = offmol.to_rdkit()
 
     elif  molfile.endswith(".pdb"):
-        rdmol = Chem.MolFromPDBFile(molfile, removeHs=removeHs)#, proximityBonding=False)
+        rdmol = Chem.RWMol(Chem.MolFromPDBFile(molfile, removeHs=removeHs, sanitize=False, proximityBonding=True))
+        conf = rdmol.GetConformer()
+
+        # Define typical bond distances (in Angstroms)
+        bond_cutoff = {
+            'C': 1.2,  # Typical C-H bond length
+            'N': 1.2,  # Typical N-H bond length
+            'O': 1.1,  # Typical O-H bond length
+        }
+
+        # Loop over atoms and infer missing bonds based on distances
+        for atom in rdmol.GetAtoms():
+            if atom.GetAtomicNum() == 1:  # Only deal with hydrogens
+                pos_h = np.array(conf.GetAtomPosition(atom.GetIdx()))
+
+                for neighbor in rdmol.GetAtoms():
+                    if neighbor.GetIdx() == atom.GetIdx():  # Skip the same atom
+                        continue
+
+                    # Get the element symbol of the neighbor atom
+                    neighbor_symbol = neighbor.GetSymbol()
+                    if neighbor_symbol in bond_cutoff:
+                        pos_neighbor = np.array(conf.GetAtomPosition(neighbor.GetIdx()))
+                        distance = np.linalg.norm(pos_h - pos_neighbor)
+
+                        # If the distance matches a typical bond length, create a bond
+                        if distance < bond_cutoff[neighbor_symbol]:
+                            try:    
+                                rdmol.AddBond(atom.GetIdx(), neighbor.GetIdx(), Chem.BondType.SINGLE)
+                            except RuntimeError:
+                                pass
+
+        rdmol = Chem.Mol(rdmol)
 
     else:
         raise NotImplementedError
@@ -38,9 +72,19 @@ def assign_bond_order_from_smiles(smiles: str, molfile: str):
 
     if smi_mol.GetNumAtoms() < lig_mol_wo_bond_orders.GetNumAtoms():
         smi_mol = Chem.AddHs(smi_mol)
-        Chem.MolToMolFile(smi_mol, "hello_smi.mol")
+        Chem.MolToMolFile(smi_mol, "smi_mol.mol")
         sanitize_rdmol(smi_mol)
+
+        Chem.MolToMolFile(lig_mol_wo_bond_orders, "pdb_mol.mol")
         sanitize_rdmol(lig_mol_wo_bond_orders)
+
+        for i,a in enumerate(smi_mol.GetAtoms()):
+            print(i, a.GetAtomicNum())
+
+        print()
+
+        for i,a in enumerate(lig_mol_wo_bond_orders.GetAtoms()):
+            print(i, a.GetAtomicNum())
 
     lig_mol = AllChem.AssignBondOrdersFromTemplate(smi_mol, lig_mol_wo_bond_orders)
     return lig_mol
@@ -91,7 +135,6 @@ def highlight_dihedral(mol, dihedral, save_path=None):
 
         except KeyError:
             pass
-
 
     AllChem.Compute2DCoords(mol_wo_H)
         

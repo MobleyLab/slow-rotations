@@ -35,14 +35,32 @@ class BadTorsionError():
 class BadTopologyError():
 	pass
 
-
-
 class TorsionFinder():
 
 	def __init__(self, trajf:str, topf: str):
 		self.trajf = trajf
 		self.topf = topf
 		self.mda_universe = mda.Universe(self.topf, self.trajf)
+
+		# solute = self.mda_universe.select_atoms("not resname HOH")
+
+		# with tempfile.NamedTemporaryFile(suffix='.xtc') as no_solvent_xtc:
+		# 	with tempfile.NamedTemporaryFile(suffix='.gro') as no_solvent_gro:
+
+		# 		print("writing out set_xticks")
+		# 		with mda.Writer(no_solvent_xtc.name, solute.n_atoms) as W:
+		# 		    for ts in self.mda_universe.trajectory:
+		# 		        W.write(solute)
+
+		# 		print("writing out gro")
+				
+		# 		with mda.Writer(no_solvent_gro.name, solute.n_atoms) as W:
+		# 		    for ts in self.mda_universe.trajectory[0]:
+		# 		        W.write(solute)
+
+		# 		print("finished writing out gro")
+
+		# 		self.mda_universe = mda.Universe(no_solvent_gro.name, no_solvent_xtc.name)
 
 	def get_torsions():
 		raise utils.NotImplementedError
@@ -410,15 +428,13 @@ class TorsionFinder():
 	def highlight_dihedral(self, dihedral, save_path=None):
 		pass
 
-	def plot_dihedral_scatter(self, torsion, title=None, show=False
-
-		, save_path=None):
+	def plot_dihedral_scatter(self, torsion, angle_min=None, title=None, show=False, save_path=None):
 		f, ax = plt.subplots()
-		X = self.get_torsion_angles(torsion)
-		ax.scatter(np.arange(len(X)), X)
+		angle_min, angles = self.shift_torsion_angles(torsion, angle_min=angle_min)
+		ax.scatter(np.arange(len(angles)), angles)
 		ax.set_ylabel("Dihedral Angle (˚)")
 		ax.set_xlabel("Frame")
-		ax.set_ylim([-180,180])
+		ax.set_ylim([angle_min,angle_min+360])
 		if title: 
 			ax.set_title(title)
 		if show:
@@ -428,7 +444,7 @@ class TorsionFinder():
 		return f,ax
 
 
-	def plot_kde(self, torsion, smoothing_window=-1, save_path=None):
+	def plot_kde(self, torsion, smoothing_window=-1, angle_min=None, save_path=None):
 
 		f, ax = plt.subplots()
 
@@ -446,6 +462,9 @@ class TorsionFinder():
 			new_X = np.arange(angle_min, angle_min+360, 360/len(new_score))
 
 		ax.plot(new_X,new_score)
+		ax.set_xlabel("Dihedral Angle (˚)")
+		ax.set_ylabel("KDE Score")
+		ax.set_xlim([angle_min,angle_min+360])
 		if save_path:
 			plt.savefig(save_path, dpi=500)
 
@@ -521,6 +540,14 @@ class TorsionFinder():
 
 		ax.axis('off')
 
+	def get_torsion_name(self, torsion):
+		d1,d2,d3,d4 = tuple(torsion)
+
+		sel_a_in_dih = self.mda_universe.select_atoms(f"index {torsion[0]}")
+		sel_resid = sel_a_in_dih[0].residue
+		return f"{sel_resid.resname}  {sel_resid.resid}"
+
+
 	def make_torsion_img(self, torsion, angle_min=None, show=False, save_path=None):
 		d1,d2,d3,d4 = tuple(torsion)
 
@@ -542,7 +569,7 @@ class TorsionFinder():
 
 		angles = self.shift_torsion_angles(torsion, angle_min=angle_min)[1].flatten()
 
-		transition_ctr = self.transition_counter(angles, min_max)
+		transition_ctr = self.transition_matrix(angles, min_max)
 
 		pdf_individual = []
 		for mm in min_max:
@@ -559,7 +586,7 @@ class TorsionFinder():
 
 		self.plot_dihedral_histogram(torsion, ax=ax[1], show=False, pdf_individual=pdf_individual, angles=angles, angle_min=angle_min)
 		ax[1].legend(states_list)
-		pdf_colors = ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'brown']
+		pdf_colors = ['red', 'orange', 'green', 'blue', 'purple', 'brown']
 		self.plot_transition_counts(transition_ctr, ax=ax[2], colors=pdf_colors)
 
 		if show:
@@ -777,7 +804,6 @@ class ProteinTorsionFinder(TorsionFinder):
 		return sel_atm_in_dih[0].residue
 
 
-
 	def determine_chi_x(self, torsion):
 		raise utils.NotImplementedError
 
@@ -808,8 +834,12 @@ class LigandTorsionFinder(TorsionFinder):
 		pdb_fixed_atype = tempfile.NamedTemporaryFile(suffix='.pdb', delete=False)
 		selection = f"resname {ligcode}"
 
+		print(ligcode)
+
 		self.export_pdb_from_traj(pdb_incorrect_atype.name, sel=selection)
 		pdbw.rename_lig_pdb_atoms(pdb_incorrect_atype.name, pdb_fixed_atype.name)
+
+		pdbw.rename_lig_pdb_atoms(pdb_incorrect_atype.name, "pdb_mol.pdb")
 
 		# begin old:
 		self.rdmol_unsanitized = rdw.assign_bond_order_from_smiles(smiles, pdb_fixed_atype.name)

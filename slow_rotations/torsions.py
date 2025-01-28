@@ -147,7 +147,7 @@ class TorsionFinder():
 
 		angle_min, X = self.shift_torsion_angles(torsion, num_bins=num_bins, angle_min=angle_min)
 
-		g = timeseries.statisticalInefficiency(X.flatten())
+		g = timeseries.statistical_inefficiency(X.flatten())
 
 		return g
 
@@ -429,10 +429,17 @@ class TorsionFinder():
 		pass
 
 	def plot_dihedral_scatter(self, torsion, angle_min=None, title=None, show=False, save_path=None):
+
+		# this is not in reference to the system indices
+		
 		f, ax = plt.subplots()
-		angle_min, angles = self.shift_torsion_angles(torsion, angle_min=angle_min)
+		#angle_min, angles = self.shift_torsion_angles(torsion, angle_min=angle_min)
+		angles = self.get_torsion_angles(torsion)
+		print(torsion)
+		print(angles.flatten())
+		angle_min=-180
 		ax.scatter(np.arange(len(angles)), angles)
-		ax.set_ylabel("Dihedral Angle (˚)")
+		ax.set_ylabel("Dihedral Angle (˚) --")
 		ax.set_xlabel("Frame")
 		ax.set_ylim([angle_min,angle_min+360])
 		if title: 
@@ -568,6 +575,9 @@ class TorsionFinder():
 		min_max = self.get_bounds_mindist(X, scores, num_peaks, peaks)
 
 		angles = self.shift_torsion_angles(torsion, angle_min=angle_min)[1].flatten()
+
+		print("image")
+		print(angles)
 
 		transition_ctr = self.transition_matrix(angles, min_max)
 
@@ -825,6 +835,7 @@ class LigandTorsionFinder(TorsionFinder):
 		self.smiles = smiles
 		self.molfile = molfile
 		self.ligcode = ligcode
+		self.trajectory_len = len(self.mda_universe.trajectory)
 
 		#if not self.check_top_has_conect(self.topf):
 		#	raise BadTopologyError
@@ -832,11 +843,10 @@ class LigandTorsionFinder(TorsionFinder):
 
 		pdb_incorrect_atype = tempfile.NamedTemporaryFile(suffix='.pdb', delete=False)
 		pdb_fixed_atype = tempfile.NamedTemporaryFile(suffix='.pdb', delete=False)
-		selection = f"resname {ligcode}"
+		selection = f"resname {self.ligcode}"
 
-		print(ligcode)
 
-		self.export_pdb_from_traj(pdb_incorrect_atype.name, sel=selection)
+		self.export_pdb_from_traj(-1, pdb_incorrect_atype.name, sel=selection)
 		pdbw.rename_lig_pdb_atoms(pdb_incorrect_atype.name, pdb_fixed_atype.name)
 
 		pdbw.rename_lig_pdb_atoms(pdb_incorrect_atype.name, "pdb_mol.pdb")
@@ -849,6 +859,7 @@ class LigandTorsionFinder(TorsionFinder):
 
 		os.unlink(pdb_fixed_atype.name)
 		os.unlink(pdb_incorrect_atype.name)
+
 
 	def check_top_has_conect(self, topf):
 		if not topf.endswith(".pdb"):
@@ -876,6 +887,20 @@ class LigandTorsionFinder(TorsionFinder):
 	def get_rdmol(self):
 		return self.rdmol
 
+	def get_rdmol_by_frame(self, frame):
+		pdb_incorrect_atype = tempfile.NamedTemporaryFile(suffix='.pdb', delete=False)
+		pdb_fixed_atype = tempfile.NamedTemporaryFile(suffix='.pdb', delete=False)
+		selection = f"resname {self.ligcode}"
+		self.export_pdb_from_traj(frame, pdb_incorrect_atype.name, sel=selection)
+		pdbw.rename_lig_pdb_atoms(pdb_incorrect_atype.name, pdb_fixed_atype.name)
+		rdmol_unsanitized = rdw.assign_bond_order_from_smiles(self.smiles, pdb_fixed_atype.name)
+		rdmol = rdw.sanitize_rdmol(Chem.Mol(rdmol_unsanitized))
+
+		os.unlink(pdb_fixed_atype.name)
+		os.unlink(pdb_incorrect_atype.name)
+		return rdmol
+
+
 	def convert_ligidx_to_sysidx(self, idx):
 		''' when ligand is not the only molecule in the system
 			converts the ligand indices starting at 0 to indices
@@ -887,9 +912,9 @@ class LigandTorsionFinder(TorsionFinder):
 		return min(indices) + idx 
 
 
-	def export_pdb_from_traj(self, opdb, sel="all"):
+	def export_pdb_from_traj(self, frame, opdb, sel="all"):
 		atms = self.mda_universe.select_atoms(sel)
-		atms.write(opdb, frames=self.mda_universe.trajectory[[-1,]], bonds='conect')
+		atms.write(opdb, frames=self.mda_universe.trajectory[[frame,]], bonds='conect')
 
 
 	def _get_torsion(self, bond):
@@ -996,6 +1021,30 @@ class LigandTorsionFinder(TorsionFinder):
 
 
 
+	def plot_dihedral_scatter(self, torsion, angle_min=None, title=None, show=False, save_path=None):
+
+		f, ax = plt.subplots()
+
+		d1,d2,d3,d4 = tuple(torsion)
+
+		torsion_sys = [self.convert_ligidx_to_sysidx(i) for i in torsion]
+
+		angles = self.shift_torsion_angles(torsion_sys, angle_min=angle_min)[1].flatten()
+
+		ax.scatter(np.arange(len(angles)), angles)
+		ax.set_ylabel("Dihedral Angle (˚) --")
+		ax.set_xlabel("Frame")
+		ax.set_ylim([angle_min,angle_min+360])
+		if title: 
+			ax.set_title(title)
+		if show:
+			plt.show()
+		if save_path:
+			plt.savefig(save_path)
+		return f,ax
+
+
+
 	def make_torsion_img(self, torsion, angle_min=None, show=False, save_path=None):
 
 		d1,d2,d3,d4 = tuple(torsion)
@@ -1019,6 +1068,9 @@ class LigandTorsionFinder(TorsionFinder):
 		min_max = self.get_bounds_mindist(X, scores, num_peaks, peaks)
 
 		angles = self.shift_torsion_angles(torsion_sys, angle_min=angle_min)[1].flatten()
+		print("angles")
+
+		print(angles)
 
 		transition_ctr = self.transition_matrix(angles, min_max)
 

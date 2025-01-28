@@ -78,15 +78,9 @@ def assign_bond_order_from_smiles(smiles: str, molfile: str):
         Chem.MolToMolFile(lig_mol_wo_bond_orders, "pdb_mol.mol")
         sanitize_rdmol(lig_mol_wo_bond_orders)
 
-        for i,a in enumerate(smi_mol.GetAtoms()):
-            print(i, a.GetAtomicNum())
-
-        print()
-
-        for i,a in enumerate(lig_mol_wo_bond_orders.GetAtoms()):
-            print(i, a.GetAtomicNum())
 
     lig_mol = AllChem.AssignBondOrdersFromTemplate(smi_mol, lig_mol_wo_bond_orders)
+    Chem.MolToMolFile(lig_mol_wo_bond_orders, "bondorder_mol.mol")
     return lig_mol
 
 def sanitize_rdmol(mol):

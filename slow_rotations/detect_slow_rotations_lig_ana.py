@@ -31,7 +31,6 @@ lig='lig42_bad'
 
 ligcode1 = "UNL"
 ligcode2 = "LIG"
-#ligtor_gas = tor.LigandTorsionFinder(str(trajf_gas),str(topf_gas),ligcode1,smiles)
 ligtor_bnd = tor.LigandTorsionFinder(str(trajf_bnd),str(topf_bnd),ligcode2,smiles)
 
 imgs_save_path = Path('/Users/megosato/Desktop/hif2a_2/')

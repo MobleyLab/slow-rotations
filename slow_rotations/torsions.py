@@ -21,6 +21,8 @@ from sklearn.cluster import KMeans
 from rdkit import Chem
 from pymbar import timeseries
 
+from rdkit.Chem.rdchem import AtomValenceException
+
 import utils
 import mappings
 import rdkit_wrapper as rdw
@@ -29,10 +31,10 @@ import molconverter as mc
 import transitions
 
 
-class BadTorsionError():
+class BadTorsionError(Exception):
 	pass
 
-class BadTopologyError():
+class BadTopologyError(Exception):
 	pass
 
 class TorsionFinder():
@@ -384,6 +386,30 @@ class TorsionFinder():
 		return transition_ctr
 
 
+	def state_populations(self, angles, range_of_states):
+		num_states = len(range_of_states)
+		which_state = []
+		for num in angles:
+			categorized = False
+			for i in range(0, num_states):
+				if range_of_states[i][0] <= num <= range_of_states[i][1]:
+					which_state.append(i)
+					categorized = True
+			if not categorized:
+				which_state.append(-1)
+
+		state_populations = {i: 0 for i in range(-1, num_states)}
+
+		for s in which_state:
+			state_populations[s] += 1
+
+		for s in range(num_states):
+			state_populations[s] /= len(angles)
+
+		return state_populations
+
+
+
 
 	def transition_matrix(self, angles, range_of_states):
 
@@ -604,6 +630,8 @@ class TorsionFinder():
 		if save_path:
 			plt.savefig(save_path)
 		return angle_min
+
+
 
 
 class ProteinTorsionFinder(TorsionFinder):
@@ -846,15 +874,25 @@ class LigandTorsionFinder(TorsionFinder):
 		selection = f"resname {self.ligcode}"
 
 
-		self.export_pdb_from_traj(-1, pdb_incorrect_atype.name, sel=selection)
-		pdbw.rename_lig_pdb_atoms(pdb_incorrect_atype.name, pdb_fixed_atype.name)
+		self.rdmol = None
+		frame = 0
+		while not self.rdmol:
+			try:
+				self.export_pdb_from_traj(frame, pdb_incorrect_atype.name, sel=selection)
+				pdbw.rename_lig_pdb_atoms(pdb_incorrect_atype.name, pdb_fixed_atype.name)
 
-		pdbw.rename_lig_pdb_atoms(pdb_incorrect_atype.name, "pdb_mol.pdb")
+				pdbw.rename_lig_pdb_atoms(pdb_incorrect_atype.name, "pdb_mol.pdb")
 
-		# begin old:
-		self.rdmol_unsanitized = rdw.assign_bond_order_from_smiles(smiles, pdb_fixed_atype.name)
-		self.rdmol = rdw.sanitize_rdmol(Chem.Mol(self.rdmol_unsanitized))
-		self.oemol = mc.get_oemol_from_rdmol(self.rdmol)
+				# begin old:
+				self.rdmol_unsanitized = rdw.assign_bond_order_from_smiles(smiles, pdb_fixed_atype.name)
+				self.rdmol = rdw.sanitize_rdmol(Chem.Mol(self.rdmol_unsanitized))
+				self.oemol = mc.get_oemol_from_rdmol(self.rdmol)
+
+			except AtomValenceException:
+				frame += 1
+				continue
+
+
 		# end old
 
 		os.unlink(pdb_fixed_atype.name)
@@ -915,9 +953,60 @@ class LigandTorsionFinder(TorsionFinder):
 	def export_pdb_from_traj(self, frame, opdb, sel="all"):
 		atms = self.mda_universe.select_atoms(sel)
 		atms.write(opdb, frames=self.mda_universe.trajectory[[frame,]], bonds='conect')
-
-
+	
 	def _get_torsion(self, bond):
+		# credit to: Travis Dabbous
+
+		pos_1 = []
+		pos_2 = []
+		pos_3 = []
+		pos_4 = []
+		
+		bgn_atom = bond.GetBeginAtom()
+		pos_2 = bgn_atom.GetIdx()
+		end_atom = bond.GetEndAtom()
+		pos_3 = end_atom.GetIdx()
+		#find the neighbors of the atoms from their lists
+		nbors_pos2 = []
+		
+		for atom in bgn_atom.GetNeighbors():
+			if bgn_atom.GetAtomicNum() != 6:
+				nbors_pos2.append(atom.GetIdx())
+			elif atom.GetAtomicNum() != 1:
+				nbors_pos2.append(atom.GetIdx())
+
+		# sorting atom indices for nbors_pos2 so lowest index is always chosen
+		nbors_pos2 = sorted(nbors_pos2)
+				
+		for atom in nbors_pos2:
+			if atom != pos_3:
+				pos_1 = atom 
+				break
+				
+		nbors_pos3 = []
+		
+		for atom in end_atom.GetNeighbors():
+			if end_atom.GetAtomicNum() != 6:
+				nbors_pos3.append(atom.GetIdx())
+			elif atom.GetAtomicNum() != 1:
+				nbors_pos3.append(atom.GetIdx())
+
+		# sorting atom indices for nbors_pos3 so lowest index is always chosen
+		nbors_pos3 = sorted(nbors_pos3)
+	   
+		for atom in nbors_pos3:
+			if atom != pos_2:
+				pos_4 = atom
+				break
+
+		if any([pos_1, pos_2, pos_3, pos_4]) == []:
+			raise BadTorsionError
+
+		# returned as a list to be able to properly index the atoms
+		# of the mda universe
+		return [pos_1, pos_2, pos_3, pos_4]
+
+	def _get_torsion_OLD(self, bond):
 		# credit to: Travis Dabbous
 
 		pos_1 = []
@@ -971,9 +1060,19 @@ class LigandTorsionFinder(TorsionFinder):
 		# only get torsions for bonds that are rotatable 
 		# rotatable bonds cannot be terminal
 		torsions = []
-		for bond in self.oemol.GetBonds(oechem.IsRotor()):
-			torsion = self._get_torsion(bond)
-			torsions.append(torsion)
+		for bond in rdw.get_rotatable_bonds(self.rdmol):
+			try:
+				torsion = self._get_torsion(bond)
+				torsions.append(torsion)
+			except BadTorsionError:
+				pass
+
+
+		print("TORSIONS")
+
+		print(torsions)
+
+		print()
 		return torsions
 
 	def highlight_dihedral(self, dihedral, save_path=None):
@@ -1097,16 +1196,21 @@ class LigandTorsionFinder(TorsionFinder):
 		pdf_colors = ['red', 'orange', 'green', 'blue', 'purple', 'brown']
 		self.plot_transition_counts(transition_ctr, ax=ax[2], colors=pdf_colors)
 
+		symmetry = False
 		if mappings.check_symmetry(self.oemol, torsion):
 			# if there is symmetry add a note on the image
 			print("SYMMETRY")
+			symmetry = True
 			ax[2].text(0.01, 0.01, f'** Warning: torsion has symmetry, disregard transitions', fontsize=15, color='red')
+
+		transition_populations = self.state_populations(angles, min_max)
+		print("POPULATIONS:", transition_populations)
 
 		if show:
 			plt.show()
 		if save_path:
 			plt.savefig(save_path)
-		return min_max, transition_ctr, states_list
+		return min_max, transition_ctr, states_list, symmetry
 
 
 

@@ -67,11 +67,16 @@ def assign_bond_order_from_smiles(smiles: str, molfile: str):
 
     # need to check to make sure I do actually need this
     lig_mol_wo_bond_orders = load_rdmol_from_file(molfile)
+    Chem.SanitizeMol(lig_mol_wo_bond_orders, sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL ^ Chem.SanitizeFlags.SANITIZE_PROPERTIES)
+
 
     smi_mol = Chem.MolFromSmiles(smiles)
 
     if smi_mol.GetNumAtoms() < lig_mol_wo_bond_orders.GetNumAtoms():
+        print('here')
         smi_mol = Chem.AddHs(smi_mol)
+        AllChem.EmbedMolecule(smi_mol)
+        AllChem.UFFOptimizeMolecule(smi_mol)
         Chem.MolToMolFile(smi_mol, "smi_mol.mol")
         sanitize_rdmol(smi_mol)
 
@@ -108,6 +113,16 @@ def get_mapped_bonds(mol, mapped_atoms):
             hit_bonds.append(mol.GetBondBetweenAtoms(aid1,aid2).GetIdx())
     return hit_bonds
 
+def get_rotatable_bonds(mol, ):
+    rotbond = Chem.MolFromSmarts('[!$(*#*)&!D1]-&!@[!$(*#*)&!D1]')
+    rotbonds = mol.GetSubstructMatches(rotbond)
+    bonds = []
+    for i1,i2 in rotbonds:
+        bonds.append(mol.GetBondBetweenAtoms(i1,i2))
+    return list(bonds)
+
+
+
 
 def highlight_dihedral(mol, dihedral, save_path=None):  
     mol = Chem.Mol(mol)
@@ -120,6 +135,7 @@ def highlight_dihedral(mol, dihedral, save_path=None):
     template_match = mol_wo_H.GetSubstructMatch(patt)
 
     index_convert = {query_match[i]: template_match[i] for i in range(len(query_match))}
+    index_convert_rev = {template_match[i]: query_match[i] for i in range(len(query_match))}
 
     new_dihedral = list()
 
@@ -131,9 +147,19 @@ def highlight_dihedral(mol, dihedral, save_path=None):
             pass
 
     AllChem.Compute2DCoords(mol_wo_H)
+
+
+    for atm in mol_wo_H.GetAtoms():
+        print(atm, str(index_convert_rev[atm.GetIdx()]))
+        atm.SetProp("atomNote", str(index_convert_rev[atm.GetIdx()]))
         
     highlightAtoms = get_mapped_heavy_atom_indices(mol_wo_H, new_dihedral)
     highlightBonds = get_mapped_bonds(mol_wo_H, new_dihedral)
+
+    
+    #offmol = Molecule.from_rdkit(mol)
+
+    #offmol.to_file('/Users/megosato/Desktop/testing.mol2', file_format='mol2')
 
     Draw.MolToImageFile(
         mol_wo_H,

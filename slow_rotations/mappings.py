@@ -15,6 +15,21 @@ def get_atom_by_index(mol, idx):
 		if a.GetIdx() == idx:
 			return a
 
+def torsions_equivalent(t1, t2):
+	'''
+		t1: tuple
+		t2: tuple
+	'''
+	t1_a1, t1_a2, t1_a3, t1_a4 = t1
+	t2_a1, t2_a2, t2_a3, t2_a4 = t2
+
+	if t1_a1 == t2_a1 and t1_a2 == t2_a2 and t1_a3 == t2_a3 and t1_a4 == t2_a4:
+		return True
+
+	if t1_a1 == t2_a4 and t1_a2 == t2_a3 and t1_a3 == t2_a2 and t1_a4 == t2_a1:
+		return True
+	return False
+
 def convert_dihedral(mapping, mol1_dih):
 	''' takes a mapping dictionary and returns the dihedral mapping
 		for the molecule based on the mapping

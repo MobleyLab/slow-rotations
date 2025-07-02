@@ -1210,7 +1210,7 @@ class LigandTorsionFinder(TorsionFinder):
 			plt.show()
 		if save_path:
 			plt.savefig(save_path)
-		return min_max, transition_ctr, states_list, symmetry
+		return min_max, transition_ctr, states_list, symmetry, transition_populations
 
 
 

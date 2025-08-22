@@ -20,4 +20,4 @@ MDAnalysisTests
 pymbar
 
 # Your own package
--e ./  # editable install of your slow-rotations local repo
+-e ../  # editable install of your slow-rotations local repo

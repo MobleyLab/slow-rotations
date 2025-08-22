@@ -1,17 +1,18 @@
 # an example for comparing simulations repeats of the same system
 
-from slow_rotations import torsions as tor
-from slow_rotations import rdkit_wrapper as rdw
-from slow_rotations import molconverter as mc
-from slow_rotations import mappings
-from slow_rotations import compare
-
+import torsions as tor
+import rdkit_wrapper as rdw
+import molconverter as mc
+import mappings
 import warnings
-import json
+import compare
+from pathlib import Path
+
+from scipy.special import kl_div
+
 
 tf_list = []
-for rpt in range(3):
-	print("Loading repeat {rpt}")
+for rpt in range(2):
 	topf_bnd = 'traj.gro'
 	trajf_bnd = f'traj_{rpt+1}.xtc'
 
@@ -20,13 +21,14 @@ for rpt in range(3):
 	ligcode1 = "LIG"
 	ligtor_bnd = tor.LigandTorsionFinder(str(trajf_bnd),str(topf_bnd),ligcode1,smiles)
 
-	tf_list.append(ligtor_bnd)
+
+	tf_list.append(pro_tf)
 
 
 
-ligcomp = compare.LigandTorsionComparator(tf_list)
+comp = compare.ProteinTorsionComparator(tf_list, 5)
 
-torsions = ligcomp.get_torsions()
+torsions = comp.get_torsions()
 
 results = {}
 for idx,t in enumerate(torsions):
@@ -34,7 +36,6 @@ for idx,t in enumerate(torsions):
 	t_result = ligcomp.plot_all_distributions(t,save_path=f"{imgname}")
 	results[f't{idx}'] = t_result
 
-
-with open("mol_torsiondata.json", "w") as f:
+import json
+with open("side_chain_torsiondata.json", "w") as f:
 	json.dump(results, f)
-

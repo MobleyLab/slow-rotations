@@ -106,44 +106,44 @@ def rd_map_mols(rdmol1, rdmol2):
 # 		return mapping
 
 
-def reindex_smiles_from_pdb(smiles, pdb):
-	''' 
-	Assigns the indices to the smiles based on the atom indices of the small molecule in the pdb. 
-	(Does the opposite of rdkit_wrapper.assign_bond_order_from_smiles)
+# def reindex_smiles_from_pdb(smiles, pdb):
+# 	''' 
+# 	Assigns the indices to the smiles based on the atom indices of the small molecule in the pdb. 
+# 	(Does the opposite of rdkit_wrapper.assign_bond_order_from_smiles)
 
-	Args:
-		smiles: str; smiles string representing small molecule in pdb
-		pdb: str; pdbfile representing small molecule in smiles
+# 	Args:
+# 		smiles: str; smiles string representing small molecule in pdb
+# 		pdb: str; pdbfile representing small molecule in smiles
 
-	Returns:
-		Chem.Mol
-	'''
+# 	Returns:
+# 		Chem.Mol
+# 	'''
 
-	smimol = oechem.OEMol()
-	oechem.OESmilesToMol(smimol, smiles)
-	omega = oeomega.OEOmega()
-	omega.SetMaxConfs(100)
-	omega.SetStrictStereo(False)
-	omega(smimol)
+# 	smimol = oechem.OEMol()
+# 	oechem.OESmilesToMol(smimol, smiles)
+# 	omega = oeomega.OEOmega()
+# 	omega.SetMaxConfs(100)
+# 	omega.SetStrictStereo(False)
+# 	omega(smimol)
 
-	pdbmol = Molecule.from_file(pdb, allow_undefined_stereo=True).to_openeye()
+# 	pdbmol = Molecule.from_file(pdb, allow_undefined_stereo=True).to_openeye()
 
-	mapping = oe_map_mols(smimol, pdbmol)
+# 	mapping = oe_map_mols(smimol, pdbmol)
 
-	rd_smimol = Molecule.from_openeye(smimol, allow_undefined_stereo=True).to_rdkit()
-	smiles_match = np.zeros(len(mapping))
-	pdb_match = np.zeros(len(mapping))
+# 	rd_smimol = Molecule.from_openeye(smimol, allow_undefined_stereo=True).to_rdkit()
+# 	smiles_match = np.zeros(len(mapping))
+# 	pdb_match = np.zeros(len(mapping))
 
-	for i,kv in enumerate(mapping.items()):
-		smiles_match[i] = kv[0]
-		pdb_match[i] = kv[1]
+# 	for i,kv in enumerate(mapping.items()):
+# 		smiles_match[i] = kv[0]
+# 		pdb_match[i] = kv[1]
 
-	pdb_argsort = np.argsort(pdb_match)
-	smiles_reorder = [ int(i) for i in smiles_match[pdb_argsort] ]
+# 	pdb_argsort = np.argsort(pdb_match)
+# 	smiles_reorder = [ int(i) for i in smiles_match[pdb_argsort] ]
 
-	rd_smimol_reorder = Chem.RenumberAtoms(rd_smimol, list(smiles_reorder))
+# 	rd_smimol_reorder = Chem.RenumberAtoms(rd_smimol, list(smiles_reorder))
 
-	return rd_smimol_reorder
+# 	return rd_smimol_reorder
 
 
 def map_mols(mol1, mol2):
@@ -159,7 +159,6 @@ def map_mols(mol1, mol2):
 	'''
 
 	rd_type = Chem.rdchem.Mol
-	oe_type = oechem.OEMol
 
 	if type(mol1) == rd_type and type(mol2) == rd_type:
 		mapping = rd_map_mols(mol1, mol2)

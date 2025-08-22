@@ -48,10 +48,7 @@ class TorsionComparator():
 		Returns
 			[int, int, int, int]: torsion in the indexing system of the trajectory specified
 		'''
-		converted_torsion = []
-		for t_idx in torsion:
-			converted_torsion.append(self.tf_list[trajidx].convert_idx_to_sysidx(self.lig_mappings[(0,trajidx)][t_idx]))
-		return converted_torsion
+		return torsion
 
  
 	def get_all_angles(self, torsion):
@@ -167,6 +164,23 @@ class LigandTorsionComparator(TorsionComparator):
 
 		self.torsions = self.tf_list[0].get_torsions()
 
+	def convert_torsion_indices(self, trajidx, torsion):	
+		'''
+		Converts torsion from first indexing system into indexing system of another trajectory
+
+		Args: 
+			trajidx: int; index of the trajectory we are converting to
+			torsion: [int, int, int, int]; torsion in the indexing system of the first trjaectory, (torsions from get_torsions function)
+
+
+		Returns
+			[int, int, int, int]: torsion in the indexing system of the trajectory specified
+		'''
+		converted_torsion = []
+		for t_idx in torsion:
+			converted_torsion.append(self.tf_list[trajidx].convert_idx_to_sysidx(self.lig_mappings[(0,trajidx)][t_idx]))
+		return converted_torsion
+
 
 	def plot_all_distributions(self, torsion, save_path=None, close=False):
 		'''
@@ -246,6 +260,7 @@ class LigandTorsionComparator(TorsionComparator):
 			label = f'Repeat {idx+1}'
 			ax[idx+1,0].text(-0.2, 0.5, label, va='center', ha='center', rotation='vertical', fontsize=20, transform=ax[idx+1,0].transAxes)
 
+			results[idx]['residue'] = self.tf_list[idx].get_residue_name_from_torsion(torsion_sys)
 			results[idx]['torsion_idx'] = torsion
 			results[idx]['torsion_system_idx'] = torsion_sys
 			results[idx]['symmetry'] = symmetry
@@ -293,20 +308,21 @@ class ProteinTorsionComparator(TorsionComparator):
 			[[int, int, int, int]]: list of torsions
 		'''
 
-		torsions = None
-		for i in range(8): 
-			print(torsions)
-			chix_torsions = self.tf_list[0].get_chi_x_torsions(i, a_cutoff=self.a_cutoff)
-			print(chix_torsions)
-			if chix_torsions != []:
-				if not torsions:
-					torsions = chix_torsions
+		# torsions = None
+		# for i in range(8): 
+		# 	print(torsions)
+		# 	chix_torsions = self.tf_list[0].get_chi_x_torsions(i, a_cutoff=self.a_cutoff)
+		# 	print(chix_torsions)
+		# 	if chix_torsions != []:
+		# 		if not torsions:
+		# 			torsions = chix_torsions
 
-				else:
-					np.concatenate(torsions, self.tf_list[0].get_chi_x_torsions(i, a_cutoff=self.a_cutoff))
-
-
-			return torsions
+		# 		else:
+		# 			np.concatenate(torsions, self.tf_list[0].get_chi_x_torsions(i, a_cutoff=self.a_cutoff))
+		
+		#i = self.tf_list[0].get_chi_x_torsions(3, a_cutoff=self.a_cutoff)
+		#print(i)
+		return self.tf_list[0].get_all_chi_x_torsions(a_cutoff=self.a_cutoff)
 
 
 
@@ -384,15 +400,13 @@ class ProteinTorsionComparator(TorsionComparator):
 			label = f'Repeat {idx+1}'
 			ax[idx+1,0].text(-0.2, 0.5, label, va='center', ha='center', rotation='vertical', fontsize=20, transform=ax[idx+1,0].transAxes)
 
-			results[idx]['torsion_idx'] = torsion
-			results[idx]['torsion_system_idx'] = torsion_sys
-			results[idx]['symmetry'] = symmetry
+			results[idx]['residue'] = self.tf_list[idx].get_residue_name_from_torsion(torsion)
+			results[idx]['chi'] = self.tf_list[idx].determine_chi_angle(torsion)
+			results[idx]['torsion_idx'] = [int(t) for t in torsion]
+			results[idx]['torsion_system_idx'] = [-1,-1,-1,-1]
 			results[idx]['missing_states'] = missing_states_rpt
+			results[idx]['symmetry'] = False
 			results[idx]['transitions'] = transition_ctr.to_dict()
-
-
-		if symmetry:
-			ax[0,1].text(0, -0.2, f'** Warning: torsion has symmetry, disregard transitions', fontsize=15, color='red', transform=ax[0,2].transAxes)
 
 		if save_path:
 			plt.savefig(save_path)

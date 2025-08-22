@@ -3,8 +3,8 @@ from  slow_rotations.analysis import *
 import csv
 
 
-torsion_data_ifile = "mol_torsiondata.json"
-flagged_torsions_ofile = "mol_flagged_torsions.csv"
+torsion_data_ifile = "sidechain_torsiondata.json"
+flagged_torsions_ofile = "sidechain_flagged_torsions.csv"
 
 
 with open(torsion_data_ifile, "r") as f:
@@ -20,8 +20,8 @@ for tname in data.list_torsions():
 	for rnum,rpt in torsion.repeats.items():
 		repeat_info = {
 			'residue': rpt.residue,
+			'chi': rpt.chi,
 			'torsion':  rpt.torsion_idx,
-			'torsion_sys':  rpt.torsion_system_idx, 
 			'repeat': rnum, 
 			'low transitions': False,
 			'missing states': '',
@@ -46,20 +46,3 @@ with open(flagged_torsions_ofile, "w", newline="") as f:
     writer = csv.DictWriter(f, fieldnames=problem_torsions[0].keys())
     writer.writeheader()
     writer.writerows(problem_torsions)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

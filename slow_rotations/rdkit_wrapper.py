@@ -195,6 +195,8 @@ def highlight_dihedral(mol, dihedral, save_path=None):
 
     index_convert = {query_match[i]: template_match[i] for i in range(len(query_match))}
     index_convert_rev = {template_match[i]: query_match[i] for i in range(len(query_match))}
+    print(index_convert)
+    print(index_convert_rev)
 
     new_dihedral = list()
 
@@ -207,9 +209,8 @@ def highlight_dihedral(mol, dihedral, save_path=None):
 
     AllChem.Compute2DCoords(mol_wo_H)
 
-
-    for atm in mol_wo_H.GetAtoms():
-        atm.SetProp("atomNote", str(index_convert_rev[atm.GetIdx()]))
+    #for atm in mol_wo_H.GetAtoms():
+    #    atm.SetProp("atomNote", str(index_convert_rev[atm.GetIdx()]))
         
     highlightAtoms = get_mapped_heavy_atom_indices(mol_wo_H, new_dihedral)
     highlightBonds = get_mapped_bonds(mol_wo_H, new_dihedral)

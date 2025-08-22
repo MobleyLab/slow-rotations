@@ -77,6 +77,23 @@ class TorsionFinder():
 	def get_torsions():
 		raise utils.NotImplementedError
 
+	def get_residue_from_torsion(self, torsion):
+			'''
+			get the residue the torsion atom indices belong to
+			Args:
+				torsion: [int, int, int, int] atom indices of atom involved in torsion
+
+			Returns:
+				Residue: MDAnalysis residue that torsion belongs to
+			'''
+			sel_atm_in_dih = self.mda_universe.select_atoms(f"index {torsion[0]}")
+			return sel_atm_in_dih[0].residue
+
+	def get_residue_name_from_torsion(self, torsion):
+		
+		residue = self.get_residue_from_torsion(torsion)
+		return f'{residue.resname}{residue.resid}'
+
 	@staticmethod
 	def get_angle_shift_point(angles, num_bins=40):
 		'''
@@ -834,7 +851,7 @@ class TorsionFinder():
 			int: minimum angle fo the histogram
 		'''
 
-		d1,d2,d3,d4 = tuple(torsion)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
+		d1,d2,d3,d4 = tuple(torsion)																																																																																																																																	
 
 		sel_a_in_dih = self.mda_universe.select_atoms(f"index {torsion[0]}")
 		sel_resid = sel_a_in_dih[0].residue
@@ -929,29 +946,54 @@ class ProteinTorsionFinder(TorsionFinder):
 		aa_interacting_list = sorted(list(aa_interacting_dict))
 		return aa_interacting_list
 
-	def get_chi1_torsions(self, resids):
-		''' 
-		identify the chi1 torsion atom indices of specified residue indices
+	# def get_chi1_torsions(self, resids=None, a_cutoff=None):
+	# 	''' 
+	# 	identify the chi1 torsion atom indices of specified residue indices
 		
-		Args:
-			resids: [int]; residue ids
+	# 	Args:
+	# 		resids: [int]; residue ids
 
-		Returns: 
-			[[int, int, int, int]]: atom indices of chi1 torsions
+	# 	Returns: 
+	# 		[[int, int, int, int]]: atom indices of chi1 torsions
+	# 	'''
+	# 	# MO TODO: Should this be consistent with get_torsions and return a 
+	# 	# list of a list of indices
+
+	# 	if a_cutoff:
+	# 		resids = self.get_residues_ags(self.get_binding_residues(a_cutoff))
+
+	# 	ags = [res.chi1_selection() for res in self.aa_only.residues[resids]]
+	# 	torsions = []
+
+	# 	for i,ag in enumerate(ags):
+	# 		if ag:
+	# 			torsions.append([ a.index for a in ag ])
+	# 		# else the residue is a "GLY" or "ALA"
+	# 		else:
+	# 			warnings.warn(f"skipping resid {resids[i]} (ALA or GLY); no chi1 torsion to select")
+
+	# 	return torsions
+
+	def get_chi1_torsions(self, resids=None, a_cutoff=None):
+		''' 
+		identify the chi1 torsion atom indices of specified residue ids
 		'''
-		# MO TODO: Should this be consistent with get_torsions and return a 
-		# list of a list of indices
+		if a_cutoff:
+			resids = self.get_binding_residues(a_cutoff)
 
-		ags = [res.chi1_selection() for res in self.aa_only.residues[resids]]
+		if resids is None:
+			residues = self.aa_only.residues
+		else:
+			# Map residue IDs → actual Residue objects
+			residues = [r for r in self.aa_only.residues if r.resid in resids]
+
 		torsions = []
-
-		for i,ag in enumerate(ags):
+		for res in residues:
+			ag = res.chi1_selection()
 			if ag:
-				torsions.append([ a.index for a in ag ])
-			# else the residue is a "GLY" or "ALA"
+				torsions.append([a.index for a in ag])
 			else:
-				warnings.warn(f"skipping resid {resids[i]} (ALA or GLY); no chi1 torsion to select")
-
+				warnings.warn(f"skipping resid {res.resid} ({res.resname}); no chi1 torsion to select")
 		return torsions
 
 	# should I write a function to get all protein torsions?
@@ -1031,6 +1073,49 @@ class ProteinTorsionFinder(TorsionFinder):
 				ags += self.mda_universe.select_atoms(f"resid {r.resid}")
 		return ags
 
+	def determine_chi_angle(self,torsion):
+		"""
+		Determine which chi angle (1 to 8) a torsion belongs to in a residue.
+
+		Args:
+			torsion: [int,int,int,int]'' list of 4 atom indices (integers)
+
+		Returns:
+			chi_number: int from 1 to 8, or None if not found
+		"""
+
+		x_atom_sel = [
+			"name N",
+			"name CA",
+			"name CB",
+			"name CG CG1",
+			"name CD CD1 OD1 ND1 SD",
+			"name NE OE1 CE",
+			"name CZ NZ",
+			"name NH1"
+		]
+
+		residue = self.get_residue_from_torsion(torsion)
+
+		# Get a mapping from atom names to their indices in this residue
+		atom_name_to_idx = {a.name: a.index for a in residue.atoms}
+
+		# For each chi angle (1 to 8), build the expected torsion atom indices
+		for chi_num in range(1, 9):
+			chi_atoms = []
+			for sel_str in x_atom_sel[chi_num - 1 : chi_num + 3]:  # select 4 consecutive atom selections
+				# Some selections contain multiple names (e.g., "CG CG1"), take the first that exists
+				sel_names = sel_str.split()
+				idx = next((atom_name_to_idx[n] for n in sel_names if n in atom_name_to_idx), None)
+				if idx is None:
+					break  # This chi angle does not exist in this residue
+				chi_atoms.append(idx)
+
+			if len(chi_atoms) == 4 and set(chi_atoms) == set(torsion):
+				return chi_num
+
+		return None  # torsion does not match any chi angle
+
 
 	def get_chi_x_ags(self, x, resgrp):
 		''' 
@@ -1094,8 +1179,8 @@ class ProteinTorsionFinder(TorsionFinder):
 		# list of the residues (not resid) that have a chiX torsion
 		chi_x_reslst = self.get_chi_x_residues(x, sel, a_cutoff)
 
-		if len(chi_x_reslst) == 0:
-			return []
+		if chi_x_reslst == []:
+			return [[]]
 		chi_x_resgrp = mda.ResidueGroup(chi_x_reslst)
 
 		resnames = list()
@@ -1104,6 +1189,16 @@ class ProteinTorsionFinder(TorsionFinder):
 
 		return self.get_chi_x_aid(x, chi_x_resgrp)
 
+
+	def get_all_chi_x_torsions(self, sel=None, a_cutoff=None):
+		torsions = []
+		for x in range(8):
+			chi_x_reslst = self.get_chi_x_torsions(x, sel, a_cutoff)
+
+			if chi_x_reslst != [[]]:
+				torsions.extend(chi_x_reslst)
+
+		return torsions
 
 
 	def save_traj_sel(self, sel, frames, save_path):
@@ -1152,24 +1247,12 @@ class ProteinTorsionFinder(TorsionFinder):
 
 			mapping = mappings.map_mols(rdmol_wH, rdmol_woH)
 
-			adj_dih = [idx - min_res_aidx for idx in dihedral]
+			adj_dih = [idx - min_res_aidx for idx in torsion]
 
 			woH_adj_dih = mappings.convert_dihedral(mapping, adj_dih)
 
 			rdw.highlight_dihedral(rdmol_woH, woH_adj_dih, save_path)
 
-
-	def get_residue_from_torsion(self, torsion):
-		'''
-		get the residue the torsion atom indices belong to
-		Args:
-			torsion: [int, int, int, int] atom indices of atom involved in torsion
-
-		Returns:
-			Residue: MDAnalysis residue that torsion belongs to
-		'''
-		sel_atm_in_dih = self.mda_universe.select_atoms(f"index {torsion[0]}")
-		return sel_atm_in_dih[0].residue
 
 
 	def determine_chi_x(self, torsion):

@@ -8,7 +8,7 @@ pymbar
 pandas
 parmed
 MDAnalysisTests
-openff-toolkit
+openff-toolkit=0.16
 sphinx
 sphinx-rtd-theme
 myst-parser

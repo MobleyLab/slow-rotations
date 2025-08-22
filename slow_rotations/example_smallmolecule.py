@@ -1,27 +1,26 @@
 # an example for comparing simulations repeats of the same system
 
-import torsions as tor
-import rdkit_wrapper as rdw
-import molconverter as mc
-import mappings
+from slow_rotations import torsions as tor
+from slow_rotations import rdkit_wrapper as rdw
+from slow_rotations import molconverter as mc
+from slow_rotations import mappings
+from slow_rotations import compare
+
 import warnings
-import compare
-from pathlib import Path
-
-from scipy.special import kl_div
-
+import json
 
 tf_list = []
-for rpt in range(2):
+for rpt in range(3):
+	print("Loading repeat {rpt}")
 	lmda=0
 	topf_bnd = '/Users/megosato/Desktop/traj.gro'
 	trajf_bnd = f'/Users/megosato/Desktop/edge_ZINC922_ZINC337835/step1/{rpt+1}/lambda_{lmda}/Production_MD/traj.xtc'
 
-	smiles = "[H]c1c(c(c2c(c1[H])C(C(C2([H])[H])([H])C(=O)O[H])([H])[H])[H])[H]" #ZINC337835
+	smiles = "[H]c1c(c(c(c(c1C(=O)O[H])O[H])[H])N([H])[H])[H]" #ZINC922
 
 	ligcode1 = "LIG"
 	ligcode2 = "UNL"
-	ligtor_bnd = tor.LigandTorsionFinder(str(trajf_bnd),str(topf_bnd),ligcode2,smiles)
+	ligtor_bnd = tor.LigandTorsionFinder(str(trajf_bnd),str(topf_bnd),ligcode1,smiles)
 
 	tf_list.append(ligtor_bnd)
 
@@ -33,10 +32,11 @@ torsions = ligcomp.get_torsions()
 
 results = {}
 for idx,t in enumerate(torsions):
-	t_result = ligcomp.plot_all_distributions(t,save_path=f"/Users/megosato/Desktop/torsions/{t}.png")
+	imgname = f'{"_".join(map(str, t))}.png'
+	t_result = ligcomp.plot_all_distributions(t,save_path=f"../example/{imgname}")
 	results[f't{idx}'] = t_result
 
-import json
-with open("/Users/megosato/Desktop/torsions/torsiondata.json", "w") as f:
+
+with open("../example/torsiondata.json", "w") as f:
 	json.dump(results, f)
 

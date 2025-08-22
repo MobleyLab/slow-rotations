@@ -1218,7 +1218,6 @@ class LigandTorsionFinder(TorsionFinder):
 				# begin old:
 				self.rdmol_unsanitized = rdw.assign_bond_order_from_smiles(smiles, pdb_fixed_atype.name)
 				self.rdmol = rdw.sanitize_rdmol(Chem.Mol(self.rdmol_unsanitized))
-				self.oemol = mc.get_oemol_from_rdmol(self.rdmol)
 
 			except AtomValenceException:
 				frame += 1

@@ -3,8 +3,8 @@ from  slow_rotations.analysis import *
 import csv
 
 
-torsion_data_ifile = "/Users/megosato/Desktop/data.json"
-flagged_torsions_ofile = "/Users/megosato/Desktop/flagged_torsions.csv"
+torsion_data_ifile = "../example/torsiondata.json"
+flagged_torsions_ofile = "../example/flagged_torsions.csv"
 
 
 with open(torsion_data_ifile, "r") as f:

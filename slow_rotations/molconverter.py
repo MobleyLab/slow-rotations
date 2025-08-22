@@ -3,18 +3,18 @@
 
 from openff.toolkit import Molecule
 
-def get_oemol_from_rdmol(rdmol):
-	'''
-  	converts RDKit Mol to OpenEye OEMol
+# def get_oemol_from_rdmol(rdmol):
+# 	'''
+#   	converts RDKit Mol to OpenEye OEMol
 
-    Args:
-        rdmol: Chem.Mol RDKit Mol
+#     Args:
+#         rdmol: Chem.Mol RDKit Mol
 
-    Returns:
-        OEMol: oechem.OEMol OpenEye Mol
-	'''
-	off_rdmol = Molecule.from_rdkit(rdmol)
-	return Molecule.to_openeye(off_rdmol)
+#     Returns:
+#         OEMol: oechem.OEMol OpenEye Mol
+# 	'''
+# 	off_rdmol = Molecule.from_rdkit(rdmol)
+# 	return Molecule.to_openeye(off_rdmol)
 
 # def get_rdmol_from_oemol(oemol):
 # 	'''

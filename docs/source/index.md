@@ -8,3 +8,5 @@ This is the documentation for the Slow Rotations project.
 
 getting_started.md
 api.md
+
+modules

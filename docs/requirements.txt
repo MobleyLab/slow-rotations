@@ -1,0 +1,12 @@
+numpy
+scipy
+matplotlib
+scikit-learn
+rdkit-pypi
+MDAnalysis
+pymbar
+sphinx
+sphinx-rtd-theme
+myst-parser
+sphinx-autodoc-typehints
+-e .

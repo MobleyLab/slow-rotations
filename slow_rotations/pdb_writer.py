@@ -22,14 +22,15 @@ def get_atom_type(atype):
 			return atm
 
 def make_standard_atmname(pmd_struct):
-	''' Converts third column pdb atom name from any atom name
-		to atom type naming convention
-		In gmx to prevent forcefield issues, we rename ligand
-		atom types either as lower case, or with extra characters
-		to prevent clashes with protein and other forcefield 
-		naming conventions
-		That atom naming conventions are the same as the atomic
-		symbol on the periodic table
+	'''
+  	Converts third column pdb atom name from any atom name to atom type naming convention.
+  	In gmx to prevent forcefield issues, we rename ligand atom types either as lower case, or with extra characters to prevent clashes with protein and other forcefield naming conventions
+
+    Args:
+        pmd_struct: parmed structure
+
+    Returns:
+        parmed.structure
 	'''
 	new_structure = pmd_struct
 
@@ -50,6 +51,16 @@ def make_standard_atmname(pmd_struct):
 	return new_structure
 
 def rename_lig_pdb_atoms(ilig_pdb: str, olig_pdb: str):
+	'''
+	Renames small molecule/ligand PDB atoms to have standard naming conventions recognized by gromacs
+
+    Args:
+        ilig_pdb: str; input pdb file name
+        olig_pdb: str; output pdb file name
+
+    Returns:
+        None
+	'''
 	lig_struct = pmd.load_file(ilig_pdb)
 	nox_lig_struct = make_standard_atmname(lig_struct)
 

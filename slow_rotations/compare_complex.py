@@ -1,7 +1,7 @@
-import torsions as tor
-import rdkit_wrapper as rdw
-import molconverter as mc
-import mappings
+from . import torsions as tor
+from . import rdkit_wrapper as rdw
+from . import molconverter as mc
+from . import mappings
 import warnings
 import matplotlib.pyplot as plt
 from pathlib import Path
@@ -12,10 +12,6 @@ ANGSTROM_CUTOFF = 5.0
 base_path = Path('/Users/megosato/Desktop/mpro/md_traj/')
 
 ligname = 'z4ylu'
-
-
-
-
 
 imgs_save_path = Path('/Users/megosato/Desktop/protein_images_compare/')
 imgs_save_path.mkdir(exist_ok=True)

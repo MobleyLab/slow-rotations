@@ -1,6 +1,10 @@
-# Welcome to My Project
+# Welcome to Slow Rotations
 
-This is my awesome documentation!
+This is the documentation for the Slow Rotations project.
 
 ## Contents
-- [Getting Started](getting_started.md)
+```{toctree}
+:maxdepth: 2
+
+getting_started.md
+api.md

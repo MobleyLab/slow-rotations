@@ -1,19 +1,22 @@
 # rdkit wrapper
 
-from utils import NotImplementedError
+from slow_rotations.utils import NotImplementedError
 from rdkit import Chem
 from rdkit.Chem import AllChem, Draw, rdFMCS
 from openff.toolkit import Molecule
 import numpy as np
 
 def load_rdmol_from_file(molfile: str, removeHs=False):
-    ''' molfile: sdf file or mol2 file representing bond order
-                 in the trajectory
+    """
+    load molecule in molfile as an RDKit Mol
+    
+    Args:
+        molfile: str; sdf or mol2 filename of small molecule
+        removeHs: bool; strip Hs from the rdkit molecule
 
-        Returns: rdkit mol
-    '''
-    # loads in molecule as openff Molecule object
-    # returns molecule as an rdkit mol object
+    Returns:
+        Chem.Mol: rdkit molecule 
+    """
 
     if molfile.endswith(".sdf") or molfile.endswith(".mol2"):
         offmol = Molecule(molfile)
@@ -60,12 +63,21 @@ def load_rdmol_from_file(molfile: str, removeHs=False):
     return rdmol
 
 def assign_bond_order_from_smiles(smiles: str, molfile: str):
+    """
+    Assigns the bond order of a rdkit molecule lacking proper bond information based on its smiles
+    
+    Args:
+        smiles: str; smiles str representing the correct bond orders
+        molfile: str; pdb, sdf, or mol2 filename of molecule that lacks correct bond order information
+
+    Returns:
+        Chem.Mol: RDKit Mol with 
+    """
+
     # the smiles will contain the bond order information
     # the molfile contains the positions and index order
     # the returned mol will contain the bond order from the 
     # smiles but the index order from the molfile
-
-    # need to check to make sure I do actually need this
     lig_mol_wo_bond_orders = load_rdmol_from_file(molfile)
     Chem.SanitizeMol(lig_mol_wo_bond_orders, sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL ^ Chem.SanitizeFlags.SANITIZE_PROPERTIES)
 
@@ -73,7 +85,6 @@ def assign_bond_order_from_smiles(smiles: str, molfile: str):
     smi_mol = Chem.MolFromSmiles(smiles)
 
     if smi_mol.GetNumAtoms() < lig_mol_wo_bond_orders.GetNumAtoms():
-        print('here')
         smi_mol = Chem.AddHs(smi_mol)
         AllChem.EmbedMolecule(smi_mol)
         AllChem.UFFOptimizeMolecule(smi_mol)
@@ -88,7 +99,16 @@ def assign_bond_order_from_smiles(smiles: str, molfile: str):
     Chem.MolToMolFile(lig_mol_wo_bond_orders, "bondorder_mol.mol")
     return lig_mol
 
-def sanitize_rdmol(mol):
+def sanitize_rdmol(mol) :
+    """
+    Checks and corrects the chemical structure of molecule. (Checks valence, aromaticity, kekulization, and stereochemistry)
+    
+    Args:
+        mol: Chem.Mol; rdkit molecule
+
+    Returns:
+        Chem.Mol: santized rdkit molecule
+    """
     # From Jeffrey Wagner, sanitize RDKIT mol
     Chem.SanitizeMol(mol, Chem.SANITIZE_ALL)
     Chem.AssignStereochemistryFrom3D(mol)
@@ -97,6 +117,16 @@ def sanitize_rdmol(mol):
     return mol
 
 def get_mapped_heavy_atom_indices(mol, mapped_atoms):
+    """
+    Finds RDKit Atom objects of interest based on mapped_atoms indices list
+
+    Args:
+        mol: (Chem.Mol) RDKit Mol
+        mapped_atoms: [int]; indices of atoms of interest
+
+    Returns:
+        list: list of RDKit Atoms 
+    """
     mapped_heavy_atoms = []
     for ai in mapped_atoms:
         if mol.GetAtomWithIdx(ai).GetAtomicNum() > 1:
@@ -105,6 +135,16 @@ def get_mapped_heavy_atom_indices(mol, mapped_atoms):
     
     
 def get_mapped_bonds(mol, mapped_atoms):
+    """
+    Finds RDKit bonds objects of interest based on mapped_atoms indices list
+
+    Args:
+        mol: (Chem.Mol) RDKit Mol
+        mapped_atoms: [int]; indices of atoms of interest
+
+    Returns:
+        list: list of RDKit bonds
+    """
     hit_bonds = []
     for bond in mol.GetBonds():
         aid1 = bond.GetBeginAtomIdx()
@@ -113,7 +153,16 @@ def get_mapped_bonds(mol, mapped_atoms):
             hit_bonds.append(mol.GetBondBetweenAtoms(aid1,aid2).GetIdx())
     return hit_bonds
 
-def get_rotatable_bonds(mol, ):
+def get_rotatable_bonds(mol):
+    """
+    Finds the rotatable bonds in molecule. A rotatable bond is a single, non-ring bond between two nonterminal, non–triple-bonded atoms. 
+
+    Args:
+        mol: (Chem.Mol) RDKit Mol
+
+    Returns:
+        list: list of RDKit Mol bonds that are rotatable
+    """
     rotbond = Chem.MolFromSmarts('[!$(*#*)&!D1]-&!@[!$(*#*)&!D1]')
     rotbonds = mol.GetSubstructMatches(rotbond)
     bonds = []
@@ -122,9 +171,19 @@ def get_rotatable_bonds(mol, ):
     return list(bonds)
 
 
-
-
 def highlight_dihedral(mol, dihedral, save_path=None):  
+    """
+    Creates an image of the molecule with the dihedral of interest highlighted in red
+    
+    Args:
+        mol: Chem.Mol; rdkit molecule
+        dihedral: (int, int, int, int); 4 consecutive atom indices that represent the torsion of interest 
+        save_path: str; file path to save image to
+
+    Returns:
+        None
+    """
+
     mol = Chem.Mol(mol)
     mol_wo_H = Chem.RemoveHs(mol)
 
@@ -150,16 +209,10 @@ def highlight_dihedral(mol, dihedral, save_path=None):
 
 
     for atm in mol_wo_H.GetAtoms():
-        print(atm, str(index_convert_rev[atm.GetIdx()]))
         atm.SetProp("atomNote", str(index_convert_rev[atm.GetIdx()]))
         
     highlightAtoms = get_mapped_heavy_atom_indices(mol_wo_H, new_dihedral)
     highlightBonds = get_mapped_bonds(mol_wo_H, new_dihedral)
-
-    
-    #offmol = Molecule.from_rdkit(mol)
-
-    #offmol.to_file('/Users/megosato/Desktop/testing.mol2', file_format='mol2')
 
     Draw.MolToImageFile(
         mol_wo_H,

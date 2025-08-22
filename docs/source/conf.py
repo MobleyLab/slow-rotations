@@ -14,11 +14,27 @@ release = '0.0.1'
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-extensions = []
+master_doc = "index"
+
+extensions = [
+    "myst_parser",            # Markdown support
+    "sphinx.ext.autodoc",     # Optional, for docstrings
+    "sphinx_autodoc_typehints",
+    "sphinx.ext.napoleon"
+]
+
+# Tell Sphinx which file types to read
+source_suffix = {
+    ".rst": "restructuredtext",
+    ".md": "markdown",
+}
 
 templates_path = ['_templates']
 exclude_patterns = []
 
+import os
+import sys
+sys.path.insert(0, os.path.abspath('../..'))
 
 
 # -- Options for HTML output -------------------------------------------------
@@ -26,3 +42,6 @@ exclude_patterns = []
 
 html_theme = 'alabaster'
 html_static_path = ['_static']
+
+
+

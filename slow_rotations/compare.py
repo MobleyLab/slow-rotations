@@ -1,245 +1,450 @@
-import torsions as tor
-import mappings
+from  slow_rotations import torsions as tor
+from slow_rotations import mappings
 import matplotlib.pyplot as plt
 import tempfile
-import rdkit_wrapper as rdw
+from slow_rotations import rdkit_wrapper as rdw
 from PIL import Image
 import numpy as np
 import pandas as pd
 import os
 from scipy.special import kl_div
 
+class TorsionComparator():
+	def __init__(self, tf_list: list):
+		'''
+		Torsion Comparator
 
-class LigandComparisonResult():
-    def __init__(
-            self, 
-            gas_tor, 
-            gas_X, 
-            gas_angles, 
-            gas_num_peaks, 
-            gas_min_max, 
-            gas_angle_min, 
-            gas_pdf_individual, 
-            gas_transition, 
-            bnd_tor, 
-            bnd_angles, 
-            bnd_num_peaks,
-            bnd_min_max, 
-            bnd_angle_min,
-            bnd_pdf_individual,
-            bnd_transition,
-        ):
-        self.gas_tor=gas_tor
-        self.gas_X = gas_X
-        self.gas_angles = gas_angles
-        self.gas_num_peaks = gas_num_peaks
-        self.gas_min_max = gas_min_max
-        self.gas_angle_min = gas_angle_min
-        self.gas_pdf_individual = gas_pdf_individual
-        self.gas_transition = gas_transition
-        self.bnd_tor = bnd_tor
-        self.bnd_angles = bnd_angles
-        self.bnd_angle_min = bnd_angle_min
-        self.bnd_num_peaks = bnd_num_peaks
-        self.bnd_min_max = bnd_min_max
-        self.bnd_pdf_individual = bnd_pdf_individual
-        self.bnd_transition = bnd_transition
+		Args:
+			tf_list: [TorsionFinder]; list of TorsionFinder to compare
 
-    def to_dict(self):
-        result = {
-            "gas": {
-                "indices": self.gas_tor,
-                "num_peaks": self.gas_num_peaks,
-                "transitions": self.gas_transition.to_dict(),
-            },
-            "bound": {
-                "indices": self.bnd_tor,
-                "num_peaks": self.bnd_num_peaks,
-                "transitions": self.bnd_transition.to_dict()
-            },
-        }
-        return result
+		Returns:
+			None
+		'''
+		self.tf_list = tf_list
+		self.torsions = self.tf_list[0].get_torsions()
 
 
-class LigandComparator():
-    def __init__(self, gas_ltf, bnd_ltf):
-        ''' gas_ltf: torsions.LigandTorsionFinder for gas phase ligand "truth"
-            bnd_ltf: torsions.LigandTorsionFinder for ligand bound to complex
-        '''
-        self.gas_ltf = gas_ltf
-        self.bnd_ltf = bnd_ltf
+	def get_torsions(self):
+		''' 
+		Get all small molecule torsions using the indexing system first input LigandTorsionFinder
 
-        self.gas_rdmol = self.gas_ltf.get_rdmol()
-        self.bnd_rdmol = self.bnd_ltf.get_rdmol()
+		Args:
+			None
 
-        # gas_bnd_map index mapping 
-        self.gas_bnd_map = mappings.rd_map_mols(self.gas_rdmol, self.bnd_rdmol)
+		Returns:
+			[[int, int, int, int]]: list of torsions 
+		'''
+		return self.torsions
 
-        # gas_tor and bnd_tor: nested list of lists shape (n,4)
-        # each nested list is 4 ints long, corresponding to one torsion
-        self.gas_tor = self.gas_ltf.get_torsions()
-        self.bnd_tor = [ mappings.convert_dihedral(self.gas_bnd_map, i) for i in self.gas_tor ]
+	def convert_torsion_indices(self, trajidx, torsion):	
+		'''
+		Converts torsion from first indexing system into indexing system of another trajectory
 
-    def get_gas_torsions(self):
-        return self.gas_tor
-
-    def get_bound_torsions(self):
-        return self.bnd_tor
-
-    def compare_torsions(self, gas_tor):
-        '''
-            Returns
-            =======
-            gas_angles:    shifted angles for the gas phase simulation
-            gas_num_peaks: number of states in the gas phase
-            gas_min_max:   boundaries of the gas phase
-            bnd_angles:    shifted angles for the ligand bound complex 
-                           simulation
-        '''
-        bnd_tor = [self.bnd_ltf.convert_ligidx_to_sysidx(i) for i in mappings.convert_dihedral(self.gas_bnd_map, gas_tor)]
-
-        gas_X, gas_scores, gas_angle_min = self.gas_ltf.get_kde(gas_tor)
-
-        gas_num_peaks, gas_peaks = self.gas_ltf.get_kde_num_peaks(gas_scores)
-
-        gas_min_max = self.gas_ltf.get_bounds_mindist(gas_X, gas_num_peaks, gas_peaks)
-
-        gas_angles = self.gas_ltf.shift_torsion_angles(gas_tor, angle_min=gas_angle_min)[1].flatten()
-        
-
-        gas_pdf_individual = []
-        for min_max in gas_min_max:
-            gmm,x,pdf,pdf_individual,bounds = self.gas_ltf.get_individual_gmm(gas_X, gas_angle_min, min_max)
-            gas_pdf_individual.append(pdf_individual)
-
-        gas_transition = self.gas_ltf.transition_counter(gas_angles, gas_min_max)
+		Args: 
+			trajidx: int; index of the trajectory we are converting to
+			torsion: [int, int, int, int]; torsion in the indexing system of the first trjaectory, (torsions from get_torsions function)
 
 
+		Returns
+			[int, int, int, int]: torsion in the indexing system of the trajectory specified
+		'''
+		converted_torsion = []
+		for t_idx in torsion:
+			converted_torsion.append(self.tf_list[trajidx].convert_idx_to_sysidx(self.lig_mappings[(0,trajidx)][t_idx]))
+		return converted_torsion
 
-        bnd_X, bnd_scores, bnd_angle_min = self.bnd_ltf.get_kde(bnd_tor)
+ 
+	def get_all_angles(self, torsion):
+		'''
+		gathers all the angles across all timeseries for the torsion of interest
+		Args:
+			torsion: [int, int, int, int]; torsion in the indexing system of the first trjaectory, (torsions from get_torsions function)
 
-        bnd_angles = self.bnd_ltf.shift_torsion_angles(bnd_tor,angle_min=bnd_angle_min)[1].flatten()
-        bnd_num_peaks, bnd_peaks = self.bnd_ltf.get_kde_num_peaks(bnd_scores)
-        bnd_min_max = self.bnd_ltf.get_bounds_mindist(bnd_X, bnd_num_peaks, bnd_peaks)
-        bnd_transition = self.bnd_ltf.transition_counter(bnd_angles, bnd_min_max)
+		Returns: 
+			[float]: timeseries of angles
+		'''
+		angles = []
 
-        bnd_pdf_individual = []
-        for min_max in bnd_min_max:
-            gmm,x,pdf,pdf_individual,bounds = self.bnd_ltf.get_individual_gmm(bnd_X, bnd_angle_min, min_max)
-            bnd_pdf_individual.append(pdf_individual)
+		for idx, tf in enumerate(self.tf_list):
+			angles.extend(tf.get_torsion_angles(self.convert_torsion_indices(idx, torsion)).flatten())
 
-
-
-        return LigandComparisonResult(
-            gas_tor, gas_X, gas_angles, gas_num_peaks, gas_min_max, gas_angle_min, gas_pdf_individual, gas_transition, 
-            bnd_tor, bnd_angles, bnd_num_peaks, bnd_min_max, bnd_angle_min, bnd_pdf_individual, bnd_transition
-        )
-
-    def get_individual_hist(self, angles, min_max):
-        min_angle = min_max[0]
-        max_angle = min_max[1]
-        angles_np = np.array(angles)
-        angles_np_1pk = angles_np[np.logical_and(angles_np >= min_angle, angles_np <= max_angle)]
-        return angles_np_1pk
+		return angles
 
 
-    def are_comparable(self, lig_comp_result: LigandComparisonResult, no_peak_threshold=0.05):
+	@staticmethod
+	def get_angle_min(angles):
+		'''
+		gets the minimum angle across all angles provided to shift histogram by such that no peaks are split
+		Args:
+			angles: [float]; list of angless
 
-        kl_div_sums = list()
+		Returns: 
+			int: minimum angle
+		'''
+		return tor.TorsionFinder.get_angle_shift_point(angles)
 
-        gas_num_angles = len(lig_comp_result.gas_angles)
-        bnd_num_angles = len(lig_comp_result.bnd_angles)
 
-        for min_max in lig_comp_result.gas_min_max:
-            gas_angles_1pk = self.get_individual_hist(lig_comp_result.gas_angles, min_max)
+	def get_cumulative_angles(self, torsion):
+		'''
+		gets all angles of the torsion across all trajectors, shifted such that no peaks are split
+		Args:
+			torsion: [int, int, int, int]; torsion in the indexing system of the first trjaectory, (torsions from get_torsions function)
 
-            bnd_angles_1pk = self.get_individual_hist(lig_comp_result.bnd_angles, min_max)
-            if len(bnd_angles_1pk)/bnd_num_angles < no_peak_threshold:
-                # condition that determines if there are enough samples in the region 
-                # to even compare or if it should be labeled as the peak is not visited
-                continue
+		Returns: 
+			int: minimum angle
+			[float]: shifted angles across all trajectories
+		'''
+		cum_angles = self.get_all_angles(torsion)
+		angle_min = TorsionComparator.get_angle_min(cum_angles)
 
-            kl_div_sums.append(sum(kl_div(gas_angles_1pk, bnd_angles_1pk)))
+		angle_min, shifted_cum_angles = tor.TorsionFinder.shift_torsion_angles(cum_angles, angle_min=angle_min)
+		return angle_min, shifted_cum_angles
 
-        return kl_div_sums
+	def plot_cumulative_distribution(self, torsion, ax=None, save_path=None, close=False):
+		'''
+		creates a matplotlib plot of the distribution across all the trajectories passed
+		Args:
+			torsion: [int, int, int, int]; torsion in the indexing system of the first trjaectory, (torsions from get_torsions function)
+			ax: axis; matplot lib axis to put the plot in
+			save_path: str; path to save 
+			close: bool; close the figure when done
+
+		Returns: 
+			int: angle minimum
+			[float]: angle location of peaks
+			[[float,float]]: bounds of peaks
+		'''
+		angle_min, cum_angles = self.get_cumulative_angles(torsion)
+
+		X,scores,angle_min = tor.TorsionFinder.get_kde(cum_angles, angle_min=angle_min)
+
+		num_peaks, peaks = tor.TorsionFinder.get_kde_num_peaks(X,scores)
+
+		min_max = tor.TorsionFinder.get_bounds_mindist(X, scores, num_peaks, peaks)
+
+		pdf_individual = []
+		for mm in min_max:
+			gmm,x,pdf,pdfi,bounds = tor.TorsionFinder.get_individual_gmm(X, angle_min, mm)
+			pdf_individual.append(pdfi)
+
+		if not ax:
+			f, ax = plt.subplots()
+
+		tor.TorsionFinder.plot_dihedral_histogram(cum_angles, ax=ax, show=False,  angle_min=angle_min, pdf_individual=pdf_individual)
+		ax.set_title("Cumulative Angle Distribution Across Repeats")
+
+		if save_path:
+			plt.savefig(save_path)
+			if close:
+				plt.close()
+
+		return angle_min, peaks, min_max
 
 
 
-    def plot_compared_dihedrals_histogram(self, gas_angles, bnd_angles, angle_min, ax=None, num_bins=40, alpha=0.5, show=True, gascolor=None, bndcolor=None):
-        self.gas_ltf.plot_dihedral_histogram(base_X, base_angle_min, ax=ax, color=gascolor)
-        self.gas_ltf.plot_dihedral_histogram(base_X, base_angle_min, ax=ax, color=bndcolor)
-        plt.title("Solvent Ligand vs. Bound Ligand")
-        plt.legend(["Solvent", "Bound"])
+class LigandTorsionComparator(TorsionComparator):
+	def __init__(self, tf_list: list):
+		'''
+		Ligand Comparator
+
+		Args:
+			tf_list: [TorsionFinder]; list of TorsionFinder to compare
+
+		Returns:
+			None
+		'''
+		self.tf_list = tf_list
+		
+		self.rdmols = []
+		for tf in self.tf_list:
+			self.rdmols.append(tf.get_rdmol())
+
+		self.lig_mappings = {}
+		self.sys_mappings = {}
+
+		for idx,rdmol in enumerate(self.rdmols):
+			self.lig_mappings[(0,idx)] = mappings.rd_map_mols(self.rdmols[0], rdmol)
+
+		self.torsions = self.tf_list[0].get_torsions()
+
+
+	def plot_all_distributions(self, torsion, save_path=None, close=False):
+		'''
+		creates a matplotlib plot of the distribution across all the trajectories passed as well as one for each individual trajectory for comparison to each other and the cumulative distribution
+		Args:
+			torsion: [int, int, int, int]; torsion in the indexing system of the first trjaectory, (torsions from get_torsions function)
+			save_path: str; path to save 
+			close: bool; close the figure when done
+
+		Returns: 
+			dict: torsion information for futher analysis
+		'''
+		num_cols = 3
+		fig_width = 8*num_cols
+		
+		num_rows = len(self.tf_list) + 1
+		fig_height = 6.25*num_rows
+		pdf_colors = ['red', 'orange', 'green', 'blue', 'purple', 'brown']
+		f,ax = plt.subplots(num_rows, num_cols, figsize=(fig_width, fig_height))
+
+		ax[0,0].axis('off')
+
+		with tempfile.NamedTemporaryFile(suffix='.png') as highlightpng:
+			self.tf_list[0].highlight_dihedral(torsion, save_path=highlightpng)
+			img = np.asarray(Image.open(highlightpng.name))
+			ax[0,2].imshow(img)
+			ax[0,2].axis('off')
+
+		angle_min, peaks, min_max_cum = self.plot_cumulative_distribution(torsion, ax=ax[0,1], save_path=None, close=False)
+		
+		results = {}
+
+
+		for idx,tf in enumerate(self.tf_list):
+			results[idx] = {}
+			torsion_sys = self.convert_torsion_indices(idx, torsion)
+
+			symmetry = False
+			if mappings.check_symmetry(self.rdmols[idx], torsion):
+				# if there is symmetry add a note on the image
+				symmetry = True
+
+			# Analyze torsion Data
+			angles = tf.get_torsion_angles(torsion_sys).flatten()
+			X,scores,angle_min = tor.TorsionFinder.get_kde(angles, angle_min=angle_min)
+			min_max= tor.TorsionFinder.get_bounds_mindist(X, scores, len(peaks), peaks)
+			for i,mm in enumerate(min_max):
+				if mm == (None, None):
+					min_max[i] = min_max_cum[i]
+			angle_min, shifted_angles = tor.TorsionFinder.shift_torsion_angles(angles, angle_min=angle_min)
+			
+			pdf_individual = []
+			missing_states_rpt = {}
+			for si, mm in enumerate(min_max):
+				try:
+					gmm,x,pdf,pdfi,bounds = tor.TorsionFinder.get_individual_gmm(X, angle_min, mm)
+					pdf_individual.append(pdfi)
+					missing_states_rpt[si] = False
+				
+				except ValueError:
+					pdf_individual.append(np.array([[],[]]))
+					# missing a state
+					missing_states_rpt[si] = True
+
+
+			# plot histogram
+			tor.TorsionFinder.plot_dihedral_histogram(angles, ax=ax[idx+1,1], show=False, angle_min=angle_min, pdf_individual=pdf_individual, pdf_colors=pdf_colors)
+
+			# plot transitions
+			transition_ctr = tor.TorsionFinder.transition_matrix(shifted_angles, min_max)
+			tor.TorsionFinder.plot_transition_counts(transition_ctr, ax=ax[idx+1,2], colors=pdf_colors)
+			transition_populations = tor.TorsionFinder.state_populations(angles, min_max)
+
+			# plot scatter
+			tor.TorsionFinder.plot_dihedral_scatter(shifted_angles, ax =ax[idx+1,0], angle_min=angle_min)
+
+			label = f'Repeat {idx+1}'
+			ax[idx+1,0].text(-0.2, 0.5, label, va='center', ha='center', rotation='vertical', fontsize=20, transform=ax[idx+1,0].transAxes)
+
+			results[idx]['torsion_idx'] = torsion
+			results[idx]['torsion_system_idx'] = torsion_sys
+			results[idx]['symmetry'] = symmetry
+			results[idx]['missing_states'] = missing_states_rpt
+			results[idx]['transitions'] = transition_ctr.to_dict()
+
+
+		if symmetry:
+			ax[0,1].text(0, -0.2, f'** Warning: torsion has symmetry, disregard transitions', fontsize=15, color='red', transform=ax[0,2].transAxes)
+
+		if save_path:
+			plt.savefig(save_path)
+
+		return results
 
 
 
-    def make_compare_torsions_img(self, lig_comparison_result, show=False, save_path=None):
+class ProteinTorsionComparator(TorsionComparator):
+	def __init__(self, tf_list: list, a_cutoff: float):
+		'''
+		Protein Comparator
 
-        gas_tor=lig_comparison_result.gas_tor 
-        gas_X=lig_comparison_result.gas_X
-        gas_angles=lig_comparison_result.gas_angles
-        gas_num_peaks=lig_comparison_result.gas_num_peaks
-        gas_min_max=lig_comparison_result.gas_min_max
-        gas_angle_min=lig_comparison_result.gas_angle_min
-        bnd_tor=lig_comparison_result.bnd_tor
-        bnd_angles=lig_comparison_result.bnd_angles
-        gas_pdf_individual=lig_comparison_result.gas_pdf_individual
-        gas_transition=lig_comparison_result.gas_transition
-        bnd_angle_min=lig_comparison_result.bnd_angle_min
-        bnd_min_max = lig_comparison_result.bnd_min_max
-        bnd_pdf_individual = lig_comparison_result.bnd_pdf_individual
-        bnd_transition=lig_comparison_result.bnd_transition
+		Args:
+			tf_list: [TorsionFinder]; list of TorsionFinder to compare
+			a_cutoff: angstrom cutoff to consider the binding site
 
-        g1,g2,g3,g4 = tuple(gas_tor)
-        b1,b2,b3,b4 = tuple(bnd_tor)
+		Returns:
+			None
+		'''
+		self.tf_list = tf_list
 
-        sup_title = f"Solvent Ligand vs. Bound Ligand"
-        gas_title = f"Solventv Ligand ({g1},{g2},{g3},{g4}) "
-        bnd_title = f"Bound Ligand ({b1},{b2},{b3},{b4})"
+		self.a_cutoff = a_cutoff
 
-        f,ax = plt.subplots(2, 3, figsize=(18, 9))
-        f.suptitle(sup_title,fontsize=60)
-        f.tight_layout(pad=3.5)
-
-        states_list = [f"s{i}" for i in range(gas_num_peaks)]
-
-        highlightpng = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
-
-        self.gas_ltf.plot_dihedral_histogram(gas_tor, angles=gas_angles, angle_min=gas_angle_min, ax=ax[0,1], pdf_individual=gas_pdf_individual, show=False, title=gas_title,color='tab:blue')
-        ax[0,1].legend(states_list)
-        self.gas_ltf.plot_dihedral_histogram(bnd_tor, angles=bnd_angles, angle_min=bnd_angle_min, ax=ax[1,1], pdf_individual=bnd_pdf_individual, show=False, title=bnd_title,color='purple')
-        ax[1,1].legend(states_list)
-        self.gas_ltf.plot_dihedral_histogram(gas_tor, angles=gas_angles, angle_min=gas_angle_min, ax=ax[1,0], show=False, title=gas_title, color='tab:blue')
-        pdf_colors = ['red', 'orange', 'green', 'blue', 'purple', 'brown']
-        bnd_angles_as_gas = self.bnd_ltf.shift_torsion_angles(bnd_tor,angle_min=gas_angle_min)[1].flatten()
-        self.gas_ltf.plot_dihedral_histogram(bnd_tor, angles=bnd_angles_as_gas, angle_min=gas_angle_min, pdf_individual=gas_pdf_individual, ax=ax[1,0], show=False, title=bnd_title, color='purple', pdf_colors=pdf_colors)
-        ax[1,0].set_title("Solvent Ligand vs. Bound Ligand")
-        ax[1,0].legend(states_list + ["Solvent", "Bound"])
+		self.torsions = self.get_torsions()
 
 
-        rdw.highlight_dihedral(self.gas_rdmol, gas_tor, highlightpng.name)
-        img = np.asarray(Image.open(highlightpng.name))
-        ax[0,0].imshow(img)
-        ax[0,0].axis('off')
+	def get_torsions(self):
+		'''
+		gets all protein sidechain torsions in the system
 
-        self.gas_ltf.plot_transition_counts(gas_transition, ax=ax[0,2],colors=pdf_colors)
+		Args:
+			None
 
-        self.gas_ltf.plot_transition_counts(bnd_transition, ax=ax[1,2], colors=pdf_colors)
+		Returns: 
+			[[int, int, int, int]]: list of torsions
+		'''
+
+		torsions = None
+		for i in range(8): 
+			print(torsions)
+			chix_torsions = self.tf_list[0].get_chi_x_torsions(i, a_cutoff=self.a_cutoff)
+			print(chix_torsions)
+			if chix_torsions != []:
+				if not torsions:
+					torsions = chix_torsions
+
+				else:
+					np.concatenate(torsions, self.tf_list[0].get_chi_x_torsions(i, a_cutoff=self.a_cutoff))
 
 
-    
-        # ax[0,2].axis('off')
-        # ax[1,2].axis('off')
+			return torsions
 
-        if show:
-            plt.show()
 
-        if save_path:
-            plt.savefig(save_path)
 
-        os.unlink(highlightpng.name)
 
-        self.bnd_ltf.plot_kde(bnd_tor, save_path = str(save_path)+"kde")
+	def plot_all_distributions(self, torsion, save_path=None, close=False):
+		'''
+		creates a matplotlib plot of the distribution across all the trajectories passed as well as one for each individual trajectory for comparison to each other and the cumulative distribution
+		Args:
+			torsion: [int, int, int, int]; torsion in the indexing system of the first trjaectory, (torsions from get_torsions function)
+			save_path: str; path to save 
+			close: bool; close the figure when done
+
+		Returns: 
+			dict: torsion information for futher analysis
+		'''
+		num_cols = 3
+		fig_width = 8*num_cols
+		
+		num_rows = len(self.tf_list) + 1
+		fig_height = 6.25*num_rows
+		pdf_colors = ['red', 'orange', 'green', 'blue', 'purple', 'brown']
+		f,ax = plt.subplots(num_rows, num_cols, figsize=(fig_width, fig_height))
+
+		ax[0,0].axis('off')
+
+		with tempfile.NamedTemporaryFile(suffix='.png') as highlightpng:
+			self.tf_list[0].highlight_dihedral(torsion, save_path=highlightpng)
+			img = np.asarray(Image.open(highlightpng.name))
+			ax[0,2].imshow(img)
+			ax[0,2].axis('off')
+
+		angle_min, peaks, min_max_cum = self.plot_cumulative_distribution(torsion, ax=ax[0,1], save_path=None, close=False)
+		
+		results = {}
+
+
+		for idx,tf in enumerate(self.tf_list):
+			results[idx] = {}
+			torsion_sys = self.convert_torsion_indices(idx, torsion)
+
+			# Analyze torsion Data
+			angles = tf.get_torsion_angles(torsion_sys).flatten()
+			X,scores,angle_min = tor.TorsionFinder.get_kde(angles, angle_min=angle_min)
+			min_max= tor.TorsionFinder.get_bounds_mindist(X, scores, len(peaks), peaks)
+			for i,mm in enumerate(min_max):
+				if mm == (None, None):
+					min_max[i] = min_max_cum[i]
+			angle_min, shifted_angles = tor.TorsionFinder.shift_torsion_angles(angles, angle_min=angle_min)
+			
+			pdf_individual = []
+			missing_states_rpt = {}
+			for si, mm in enumerate(min_max):
+				try:
+					gmm,x,pdf,pdfi,bounds = tor.TorsionFinder.get_individual_gmm(X, angle_min, mm)
+					pdf_individual.append(pdfi)
+					missing_states_rpt[si] = False
+				
+				except ValueError:
+					pdf_individual.append(np.array([[],[]]))
+					# missing a state
+					missing_states_rpt[si] = True
+
+
+			# plot histogram
+			tor.TorsionFinder.plot_dihedral_histogram(angles, ax=ax[idx+1,1], show=False, angle_min=angle_min, pdf_individual=pdf_individual, pdf_colors=pdf_colors)
+
+			# plot transitions
+			transition_ctr = tor.TorsionFinder.transition_matrix(shifted_angles, min_max)
+			tor.TorsionFinder.plot_transition_counts(transition_ctr, ax=ax[idx+1,2], colors=pdf_colors)
+			transition_populations = tor.TorsionFinder.state_populations(angles, min_max)
+
+			# plot scatter
+			tor.TorsionFinder.plot_dihedral_scatter(shifted_angles, ax =ax[idx+1,0], angle_min=angle_min)
+
+			label = f'Repeat {idx+1}'
+			ax[idx+1,0].text(-0.2, 0.5, label, va='center', ha='center', rotation='vertical', fontsize=20, transform=ax[idx+1,0].transAxes)
+
+			results[idx]['torsion_idx'] = torsion
+			results[idx]['torsion_system_idx'] = torsion_sys
+			results[idx]['symmetry'] = symmetry
+			results[idx]['missing_states'] = missing_states_rpt
+			results[idx]['transitions'] = transition_ctr.to_dict()
+
+
+		if symmetry:
+			ax[0,1].text(0, -0.2, f'** Warning: torsion has symmetry, disregard transitions', fontsize=15, color='red', transform=ax[0,2].transAxes)
+
+		if save_path:
+			plt.savefig(save_path)
+
+		return results
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+		
+
 
 
 

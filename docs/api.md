@@ -11,7 +11,7 @@
    :undoc-members:
    :show-inheritance:
 
-.. automodule:: slow_rotations.compare_complex
+.. automodule:: slow_rotations.analysis
    :members:
    :undoc-members:
    :show-inheritance:

@@ -1,3 +1,4 @@
 # slow_rotations
 
-this is the slow rotations project repository
+
+Installation instructions and API documentation can be found at [readthedocs](https://slow-rotations.readthedocs.io/en/latest/index.html)

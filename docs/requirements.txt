@@ -1,4 +1,7 @@
 # Core scientific packages
+sphinx
+sphinx_rtd_theme
+myst-parser
 numpy
 scipy
 pandas

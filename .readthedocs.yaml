@@ -7,9 +7,9 @@ version: 2
 # Set the OS, Python version, and other tools you might need
 build:
   os: ubuntu-24.04
-
-conda:
-  environment: environment.yaml
+  commands:
+    - conda env create -f environment.yaml
+    - conda activate slow-rotations-docs
 
 # Build documentation in the "docs/" directory with Sphinx
 sphinx:

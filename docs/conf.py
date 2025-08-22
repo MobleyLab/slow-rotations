@@ -46,6 +46,8 @@ html_static_path = ['_static']
 autodoc_mock_imports = [
     "MDAnalysisTests",
     "openff.toolkit",
+    "openff"
+    "openff_toolkit",
 ]
 
 

@@ -14,7 +14,7 @@ rdkit
 parmed
 MDAnalysis
 MDAnalysisTests
-openff-toolkit
+#openff-toolkit
 
 # Free energy / statistical mechanics
 pymbar

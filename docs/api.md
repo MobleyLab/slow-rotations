@@ -42,3 +42,9 @@
    :members:
    :undoc-members:
    :show-inheritance:utils
+
+
+.. automodule:: slow_rotations.utils
+   :members:
+   :undoc-members:
+   :show-inheritance:

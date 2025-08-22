@@ -1,0 +1,15 @@
+name: slow-rotations-docs
+channels:
+  - conda-forge
+dependencies:
+  - python=3.13
+  - numpy
+  - scipy
+  - matplotlib
+  - scikit-learn
+  - rdkit
+  - mdanalysis
+  - pip
+  - pip:
+      - -e .   # installs your custom package in editable mode
+      - pymbar

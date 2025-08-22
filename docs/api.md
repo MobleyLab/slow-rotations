@@ -41,7 +41,7 @@
 .. automodule:: slow_rotations.torsions
    :members:
    :undoc-members:
-   :show-inheritance:utils
+   :show-inheritance
 
 
 .. automodule:: slow_rotations.utils

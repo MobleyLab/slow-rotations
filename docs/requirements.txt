@@ -2,9 +2,13 @@ numpy
 scipy
 matplotlib
 scikit-learn
-rdkit-pypi
+rdkit
 MDAnalysis
 pymbar
+pandas
+parmed
+MDAnalysisTests
+openff-toolkit
 sphinx
 sphinx-rtd-theme
 myst-parser

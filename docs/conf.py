@@ -43,5 +43,10 @@ sys.path.insert(0, os.path.abspath('..'))
 html_theme = 'alabaster'
 html_static_path = ['_static']
 
+autodoc_mock_imports = [
+    "MDAnalysisTests",
+    "openff",
+]
+
 
 

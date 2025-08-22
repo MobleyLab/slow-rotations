@@ -1,5 +1,4 @@
 # Core scientific packages
-openff-toolkit
 sphinx
 sphinx_rtd_theme
 sphinx_autodoc_typehints

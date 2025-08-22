@@ -38,12 +38,23 @@ Example scripts and outputs can be found in the `slow-rotations/examples` path i
 
 4. Look for the output torsion images and `.json` file in `slow-rotations/examples`
 
-	![Example](./images/14_7_4_1.png)
+	![Example](./images/8_6_3_0.png)
 
 5. Analyze the each torsion for potential sampling issues
 	```
 	python examples/example_analysis.py
 	```
+
+6. Check `examples/flaggedtorsions.csv` to see which torsions are flagged.
+	* In the example below all 3 repeats are flagged for low transitions and repeat 1 is flagged for a missing state (see step 4)
+
+	| torsion         | torsion_sys               | repeat | low transitions | missing states |
+	|-----------------|---------------------------|--------|-----------------|----------------|
+	| [8, 6, 3, 0]    | [2554, 2552, 2549, 2546] | 0      | True            |                |
+	| [8, 6, 3, 0]    | [2554, 2552, 2549, 2546] | 1      | True            | 1              |
+	| [8, 6, 3, 0]    | [2554, 2552, 2549, 2546] | 2      | True            |                |
+
+
 
 
 

@@ -9,6 +9,10 @@ dependencies:
   - scikit-learn
   - rdkit
   - mdanalysis
+  - sphinx
+  - sphinx-rtd-theme
+  - myst-parser
+  - sphinx-autodoc-typehints
   - pip
   - pip:
       - -e .   # installs your custom package in editable mode

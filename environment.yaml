@@ -15,5 +15,5 @@ dependencies:
   - sphinx-autodoc-typehints
   - pip
   - pip:
-      - -e .   # installs your custom package in editable mode
+      - .   # installs your custom package in editable mode
       - pymbar

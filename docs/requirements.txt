@@ -1,18 +1,18 @@
 # Core scientific packages
-numpy>=1.25.0,<2.0
-scipy>=1.11.0,<2.0
-pandas>=2.1.0,<3.0
-matplotlib>=3.7.1,<4.0
-scikit-learn>=1.3.0,<2.0
+numpy
+scipy
+pandas
+matplotlib
+scikit-learn
 
 # Chemistry & molecular dynamics
-rdkit>=2025.3.5
-parmed>=4.3.0
-MDAnalysis>=2.10.0
-MDAnalysisTests>=2.10.0
+rdkit
+parmed
+MDAnalysis
+MDAnalysisTests
 
 # Free energy / statistical mechanics
-pymbar>=4.0.3
+pymbar
 
 # Your own package
 -e ./  # editable install of your slow-rotations local repo

@@ -76,7 +76,7 @@ Example scripts and outputs can be found in the `slow-rotations/examples` path i
 	```
 
 6. Check `examples/sidechain_flaggedtorsions.csv` to see which torsions are flagged.
-	* In the example below all 3 repeats are flagged for low transitions and repeat 1 is flagged for a missing state (see step 4)
+	* In the example below both repeats are flagged for low transitions and repeat 1 is flagged for a missing state (see step 4)
 
 	| residue | chi | torsion               | repeat | low transitions | missing states |
 	|---------|-----|----------------------|--------|----------------|----------------|

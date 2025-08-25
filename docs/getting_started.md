@@ -34,77 +34,77 @@ This object requires:
 This object finds all torsions across rotatable bonds, analyzes each torsion for the states it prefers to occupy, and counts the transitions between states across the time series.
 
 ```python
-	from slow_rotations import torsions
+from slow_rotations import torsions
 
-	topf = 'traj.gro'
-	trajf = 'traj.xtc'
-	smiles = "[H]c1c(c(c(c(c1C(=O)O[H])O[H])[H])N([H])[H])[H]"
-	ligcode = "LIG"
+topf = 'traj.gro'
+trajf = 'traj.xtc'
+smiles = "[H]c1c(c(c(c(c1C(=O)O[H])O[H])[H])N([H])[H])[H]"
+ligcode = "LIG"
 
-	tf = torsions.LigandTorsionFinder(trajf,topf,ligcode,smiles)
+tf = torsions.LigandTorsionFinder(trajf,topf,ligcode,smiles)
 
-	results = {}
+results = {}
 
-	# loop through torsions in the small molecule
-	# each torsion is represented by 4 atom indices
-	for tor in tf.get_torsions():
-		imgname = f'{"_".join(map(str, tor))}.png'
-		t_result = ligcomp.make_torsion_img(t,save_path=f"{imgname}")
+# loop through torsions in the small molecule
+# each torsion is represented by 4 atom indices
+for tor in tf.get_torsions():
+	imgname = f'{"_".join(map(str, tor))}.png'
+	t_result = ligcomp.make_torsion_img(t,save_path=f"{imgname}")
 
-		results[tor] = t_result
+	results[tor] = t_result
 ```
 
 You can also analyze multiple simulations with the same small molecule at one time, and compare across simulations
 
 ```python
-	from slow_rotations import torsions
+from slow_rotations import torsions
 
-	topfs = ['traj1.gro', 'traj2.gro', 'traj3.gro']
-	trajfs = ['traj1.xtc', 'traj2.xtc', 'traj3.xtc']
-	smiles = "[H]c1c(c(c(c(c1C(=O)O[H])O[H])[H])N([H])[H])[H]"
-	ligcode = "LIG"
+topfs = ['traj1.gro', 'traj2.gro', 'traj3.gro']
+trajfs = ['traj1.xtc', 'traj2.xtc', 'traj3.xtc']
+smiles = "[H]c1c(c(c(c(c1C(=O)O[H])O[H])[H])N([H])[H])[H]"
+ligcode = "LIG"
 
-	tf_list = []
-	for topf, trajf in zip(topfs, trajfs):
-		tfs.append(torsions.LigandTorsionFinder(trajf,topf,ligcode,smiles))
+tf_list = []
+for topf, trajf in zip(topfs, trajfs):
+	tfs.append(torsions.LigandTorsionFinder(trajf,topf,ligcode,smiles))
 
-	
-	comparator = compare.LigandTorsionComparator(tf_list)
 
-	for tor in tf.get_torsions():
-		imgname = f'{"_".join(map(str, tor))}.png'
-		t_result = comparator.plot_all_distributions(t,save_path=f"{imgname}")
+comparator = compare.LigandTorsionComparator(tf_list)
 
-		results[tor] = t_result
+for tor in tf.get_torsions():
+	imgname = f'{"_".join(map(str, tor))}.png'
+	t_result = comparator.plot_all_distributions(t,save_path=f"{imgname}")
+
+	results[tor] = t_result
 ```
 
 The torsion analysis results from either the `LigandTorsionFinder` or the `LigandTorsionComparator` can be saved into a `.json` file. 
 ```python
-	import json
+import json
 
-	with open("mol_torsiondata.json", "w") as f:
-		json.dump(results, f)
+with open("mol_torsiondata.json", "w") as f:
+	json.dump(results, f)
 ```
 
 
 This json file can be analyzed for torsions that may have sampling problems.
 ```python
-	from slow_rotations import torsiondata as td
-	from slow_rotations import analysis
+from slow_rotations import torsiondata as td
+from slow_rotations import analysis
 
-	torsion_data_ifile = "smallmolecule_torsiondata.json"
-	flagged_torsions_ofile = "smallmolecule_flagged_torsions.csv"
+torsion_data_ifile = "smallmolecule_torsiondata.json"
+flagged_torsions_ofile = "smallmolecule_flagged_torsions.csv"
 
-	with open(torsion_data_ifile, "r") as f:
-	    json_str = f.read()
+with open(torsion_data_ifile, "r") as f:
+    json_str = f.read()
 
-	data = td.TorsionData.from_json(json_str)
+data = td.TorsionData.from_json(json_str)
 
-	for tname in data.list_torsions():
-		torsion = data.get_torsion(tname)
-		for rnum,rpt in torsion.repeats.items():
-			if check_transitions(rpt) or check_states(rpt):
-				print(f'{torsion} suspected sampling problem')
+for tname in data.list_torsions():
+	torsion = data.get_torsion(tname)
+	for rnum,rpt in torsion.repeats.items():
+		if check_transitions(rpt) or check_states(rpt):
+			print(f'{torsion} suspected sampling problem')
 ```
 
 
@@ -148,72 +148,72 @@ This object requires:
 This object finds all torsions across rotatable bonds, analyzes each torsion for the states it prefers to occupy, and counts the transitions between states across the time series.
 
 ```python
-	from slow_rotations import torsions
+from slow_rotations import torsions
 
-	topf = 'traj.gro'
-	trajf = 'traj.xtc'
+topf = 'traj.gro'
+trajf = 'traj.xtc'
 
-	ligcode = "LIG"
-	tf = torsions.ProteinTorsionFinder(trajf,topf,ligcode1)
+ligcode = "LIG"
+tf = torsions.ProteinTorsionFinder(trajf,topf,ligcode1)
 
-	results = {}
-	for idx,t in tf.get_torsion():
-		imgname = f'{"_".join(map(str, t))}.png'
-		t_result = comparator.plot_all_distributions(t,save_path=f"{imgname}")
+results = {}
+for idx,t in tf.get_torsion():
+	imgname = f'{"_".join(map(str, t))}.png'
+	t_result = comparator.plot_all_distributions(t,save_path=f"{imgname}")
 
-		results[tor] = t_result
+	results[tor] = t_result
 ```
 
 You can also analyze multiple simulations with the same small molecule at one time, and compare across simulations
 
 ```python
-	from slow_rotations import torsions
+from slow_rotations import torsions
 
-	topfs = ['traj1.gro', 'traj2.gro', 'traj3.gro']
-	trajfs = ['traj1.xtc', 'traj2.xtc', 'traj3.xtc']
-	ligcode = "LIG"
+topfs = ['traj1.gro', 'traj2.gro', 'traj3.gro']
+trajfs = ['traj1.xtc', 'traj2.xtc', 'traj3.xtc']
+ligcode = "LIG"
 
-	tf_list = []
-	for topf, trajf in zip(topfs, trajfs):
-		tfs.append(torsions.ProteinTorsionFinder(trajf,topf,smiles))
+tf_list = []
+for topf, trajf in zip(topfs, trajfs):
+	tfs.append(torsions.ProteinTorsionFinder(trajf,topf,smiles))
 
-	
-	comparator = compare.ProteinTorsionComparator(tf_list)
 
-	for tor in tf.get_torsions():
-		imgname = f'{"_".join(map(str, tor))}.png'
-		t_result = compare.plot_all_distributions(t,save_path=f"{imgname}")
+comparator = compare.ProteinTorsionComparator(tf_list)
 
-		results[tor] = t_result
+for tor in tf.get_torsions():
+	imgname = f'{"_".join(map(str, tor))}.png'
+	t_result = compare.plot_all_distributions(t,save_path=f"{imgname}")
+
+	results[tor] = t_result
 ```
 
 The torsion analysis results from either the `ProteinTorsionFinder` or the `ProteinTorsionComparator` can be saved into a `.json` file. 
 ```python
-	import json
+import json
 
-	with open("sidechain_torsiondata.json", "w") as f:
-		json.dump(results, f)
+with open("sidechain_torsiondata.json", "w") as f:
+	json.dump(results, f)
 ```
 
 
 This json file can be analyzed for torsions that may have sampling problems.
 ```python
-	from slow_rotations import torsiondata as td
-	from slow_rotations import analysis
+from slow_rotations import torsiondata as td
+from slow_rotations import analysis
 
-	torsion_data_ifile = "sidechain_torsiondata.json"
-	flagged_torsions_ofile = "sidechain_flagged_torsions.csv"
+torsion_data_ifile = "sidechain_torsiondata.json"
+flagged_torsions_ofile = "sidechain_flagged_torsions.csv"
 
-	with open(torsion_data_ifile, "r") as f:
-	    json_str = f.read()
+with open(torsion_data_ifile, "r") as f:
+    json_str = f.read()
 
-	data = td.TorsionData.from_json(json_str)
+data = td.TorsionData.from_json(json_str)
 
-	for tname in data.list_torsions():
-		torsion = data.get_torsion(tname)
-		for rnum,rpt in torsion.repeats.items():
-			if check_transitions(rpt) or check_states(rpt):
-				print(f'{torsion} suspected sampling problem')
+for tname in data.list_torsions():
+	torsion = data.get_torsion(tname)
+	for rnum,rpt in torsion.repeats.items():
+		if check_transitions(rpt) or check_states(rpt):
+			print(f'{torsion} suspected sampling problem')
 ```
 
 ## Run an example for protein sidechains

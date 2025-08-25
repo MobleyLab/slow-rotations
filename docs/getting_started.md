@@ -66,7 +66,7 @@ ligcode = "LIG"
 
 tf_list = []
 for topf, trajf in zip(topfs, trajfs):
-	tfs.append(torsions.LigandTorsionFinder(trajf,topf,ligcode,smiles))
+	tf_list.append(torsions.LigandTorsionFinder(trajf,topf,ligcode,smiles))
 
 
 comparator = compare.LigandTorsionComparator(tf_list)
@@ -160,7 +160,7 @@ topf = 'traj.gro'
 trajf = 'traj.xtc'
 
 ligcode = "LIG"
-tf = torsions.ProteinTorsionFinder(trajf,topf,ligcode1)
+tf = torsions.ProteinTorsionFinder(trajf,topf,ligcode)
 
 results = {}
 for idx,t in tf.get_all_chi_x_torsions(A_cutoff=5):
@@ -181,7 +181,7 @@ ligcode = "LIG"
 
 tf_list = []
 for topf, trajf in zip(topfs, trajfs):
-	tfs.append(torsions.ProteinTorsionFinder(trajf,topf,smiles))
+	tf_list.append(torsions.ProteinTorsionFinder(trajf,topf,smiles))
 
 
 comparator = compare.ProteinTorsionComparator(tf_list)

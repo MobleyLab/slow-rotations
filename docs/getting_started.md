@@ -108,7 +108,7 @@ for tname in data.list_torsions():
 ```
 
 
-## Run an pre-made example for small molecules
+## Run a pre-made example for small molecules
 Example scripts and outputs can be found in the `slow-rotations/examples` path in the github directory
 
 1. Download the example trajectories 
@@ -222,7 +222,7 @@ for tname in data.list_torsions():
 			print(f'{torsion} suspected sampling problem')
 ```
 
-## Run an example for protein sidechains
+## Run a pre-made example for protein sidechains
 Example scripts and outputs can be found in the `slow-rotations/examples` path in the github directory
 
 1. Download the example trajectories 

@@ -82,4 +82,3 @@ dependencies:
       - pockets==0.9.1
       - pymsmt==22.0
       - pytraj==2.0.6
-prefix: /Users/megosato/miniforge3/envs/slowrotations

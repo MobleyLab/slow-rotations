@@ -71,7 +71,7 @@ for topf, trajf in zip(topfs, trajfs):
 
 comparator = compare.LigandTorsionComparator(tf_list)
 
-for tor in tf.get_torsions():
+for tor in comparator.get_torsions():
 	imgname = f'{"_".join(map(str, tor))}.png'
 	t_result = comparator.plot_all_distributions(t,save_path=f"{imgname}")
 
@@ -146,6 +146,12 @@ This object requires:
 * 3 letter code for the small molecule
 
 This object finds all torsions across rotatable bonds, analyzes each torsion for the states it prefers to occupy, and counts the transitions between states across the time series.
+You can focus on a specific side chain torsions based on:
+* distance from binding site (use the `A_cutoff` keyword)
+* a specific selection (use the `sel` keyword with [MDAnalysis selection language](https://docs.mdanalysis.org/stable/documentation_pages/selections.html))
+* `get_chi_x_torsions(x, AngstromDistFromBindingSite)` -> a single type of chi angle (1 to 8) 
+* `get_all_chi_x_torsions(AngstromDistFromBindingSite)` -> all chi angles 
+
 
 ```python
 from slow_rotations import torsions
@@ -157,7 +163,7 @@ ligcode = "LIG"
 tf = torsions.ProteinTorsionFinder(trajf,topf,ligcode1)
 
 results = {}
-for idx,t in tf.get_torsion():
+for idx,t in tf.get_all_chi_x_torsions(A_cutoff=5):
 	imgname = f'{"_".join(map(str, t))}.png'
 	t_result = comparator.plot_all_distributions(t,save_path=f"{imgname}")
 
@@ -180,7 +186,7 @@ for topf, trajf in zip(topfs, trajfs):
 
 comparator = compare.ProteinTorsionComparator(tf_list)
 
-for tor in tf.get_torsions():
+for tor in comparator.get_torsions():
 	imgname = f'{"_".join(map(str, tor))}.png'
 	t_result = compare.plot_all_distributions(t,save_path=f"{imgname}")
 

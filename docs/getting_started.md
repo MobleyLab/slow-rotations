@@ -23,8 +23,92 @@ This guide will help you quickly install `slow-rotations`. A molecular dynamics 
 
 3. You should be able to run `slow-rotations` scripts now!
 
+## Using slow-rotations for analyzing small molecule torsions
+To use slow rotations to analyze small molecule torsions, use an object found in the `torsions` module called `LigandTorsionFinder`.
+This object requires:
+* a trajectory file
+* a topology file
+* 3 letter code for the small molecule
+* SMILES string to extract the bond information for the small molecules
 
-## Run an example for small molecules
+This object finds all torsions across rotatable bonds, analyzes each torsion for the states it prefers to occupy, and counts the transitions between states across the time series.
+
+```python
+	from slow_rotations import torsions
+
+	topf = 'traj.gro'
+	trajf = 'traj.xtc'
+	smiles = "[H]c1c(c(c(c(c1C(=O)O[H])O[H])[H])N([H])[H])[H]"
+	ligcode = "LIG"
+
+	tf = torsions.LigandTorsionFinder(trajf,topf,ligcode,smiles)
+
+	results = {}
+
+	# loop through torsions in the small molecule
+	# each torsion is represented by 4 atom indices
+	for tor in tf.get_torsions():
+		imgname = f'{"_".join(map(str, tor))}.png'
+		t_result = ligcomp.make_torsion_img(t,save_path=f"{imgname}")
+
+		results[tor] = t_result
+```
+
+You can also analyze multiple simulations with the same small molecule at one time, and compare across simulations
+
+```python
+	from slow_rotations import torsions
+
+	topfs = ['traj1.gro', 'traj2.gro', 'traj3.gro']
+	trajfs = ['traj1.xtc', 'traj2.xtc', 'traj3.xtc']
+	smiles = "[H]c1c(c(c(c(c1C(=O)O[H])O[H])[H])N([H])[H])[H]"
+	ligcode = "LIG"
+
+	tf_list = []
+	for topf, trajf in zip(topfs, trajfs):
+		tfs.append(torsions.LigandTorsionFinder(trajf,topf,ligcode,smiles))
+
+	
+	comparator = compare.LigandTorsionComparator(tf_list)
+
+	for tor in tf.get_torsions():
+		imgname = f'{"_".join(map(str, tor))}.png'
+		t_result = comparator.plot_all_distributions(t,save_path=f"{imgname}")
+
+		results[tor] = t_result
+```
+
+The torsion analysis results from either the `LigandTorsionFinder` or the `LigandTorsionComparator` can be saved into a `.json` file. 
+```python
+	import json
+
+	with open("mol_torsiondata.json", "w") as f:
+		json.dump(results, f)
+```
+
+
+This json file can be analyzed for torsions that may have sampling problems.
+```python
+	from slow_rotations import torsiondata as td
+	from slow_rotations import analysis
+
+	torsion_data_ifile = "smallmolecule_torsiondata.json"
+	flagged_torsions_ofile = "smallmolecule_flagged_torsions.csv"
+
+	with open(torsion_data_ifile, "r") as f:
+	    json_str = f.read()
+
+	data = td.TorsionData.from_json(json_str)
+
+	for tname in data.list_torsions():
+		torsion = data.get_torsion(tname)
+		for rnum,rpt in torsion.repeats.items():
+			if check_transitions(rpt) or check_states(rpt):
+				print(f'{torsion} suspected sampling problem')
+```
+
+
+## Run an pre-made example for small molecules
 Example scripts and outputs can be found in the `slow-rotations/examples` path in the github directory
 
 1. Download the example trajectories 
@@ -53,6 +137,84 @@ Example scripts and outputs can be found in the `slow-rotations/examples` path i
 	| LIG1    | [8, 6, 3, 0]  | [2554, 2552, 2549, 2546] | 0      | True           |                |
 	| LIG1    | [8, 6, 3, 0]  | [2554, 2552, 2549, 2546] | 1      | True           | 1              |
 	| LIG1    | [8, 6, 3, 0]  | [2554, 2552, 2549, 2546] | 2      | True           |                |
+
+## Using slow-rotations for analyzing protein sidechain torsions
+To use slow rotations to analyze small molecule torsions, use an object found in the `torsions` module called `LigandTorsionFinder`.
+This object requires:
+* a trajectory file
+* a topology file
+* 3 letter code for the small molecule
+
+This object finds all torsions across rotatable bonds, analyzes each torsion for the states it prefers to occupy, and counts the transitions between states across the time series.
+
+```python
+	from slow_rotations import torsions
+
+	topf = 'traj.gro'
+	trajf = 'traj.xtc'
+
+	ligcode = "LIG"
+	tf = torsions.ProteinTorsionFinder(trajf,topf,ligcode1)
+
+	results = {}
+	for idx,t in tf.get_torsion():
+		imgname = f'{"_".join(map(str, t))}.png'
+		t_result = comparator.plot_all_distributions(t,save_path=f"{imgname}")
+
+		results[tor] = t_result
+```
+
+You can also analyze multiple simulations with the same small molecule at one time, and compare across simulations
+
+```python
+	from slow_rotations import torsions
+
+	topfs = ['traj1.gro', 'traj2.gro', 'traj3.gro']
+	trajfs = ['traj1.xtc', 'traj2.xtc', 'traj3.xtc']
+	ligcode = "LIG"
+
+	tf_list = []
+	for topf, trajf in zip(topfs, trajfs):
+		tfs.append(torsions.ProteinTorsionFinder(trajf,topf,smiles))
+
+	
+	comparator = compare.ProteinTorsionComparator(tf_list)
+
+	for tor in tf.get_torsions():
+		imgname = f'{"_".join(map(str, tor))}.png'
+		t_result = compare.plot_all_distributions(t,save_path=f"{imgname}")
+
+		results[tor] = t_result
+```
+
+The torsion analysis results from either the `ProteinTorsionFinder` or the `ProteinTorsionComparator` can be saved into a `.json` file. 
+```python
+	import json
+
+	with open("sidechain_torsiondata.json", "w") as f:
+		json.dump(results, f)
+```
+
+
+This json file can be analyzed for torsions that may have sampling problems.
+```python
+	from slow_rotations import torsiondata as td
+	from slow_rotations import analysis
+
+	torsion_data_ifile = "sidechain_torsiondata.json"
+	flagged_torsions_ofile = "sidechain_flagged_torsions.csv"
+
+	with open(torsion_data_ifile, "r") as f:
+	    json_str = f.read()
+
+	data = td.TorsionData.from_json(json_str)
+
+	for tname in data.list_torsions():
+		torsion = data.get_torsion(tname)
+		for rnum,rpt in torsion.repeats.items():
+			if check_transitions(rpt) or check_states(rpt):
+				print(f'{torsion} suspected sampling problem')
+```
 
 ## Run an example for protein sidechains
 Example scripts and outputs can be found in the `slow-rotations/examples` path in the github directory

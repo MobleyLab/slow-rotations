@@ -171,7 +171,17 @@ def get_rotatable_bonds(mol):
     return list(bonds)
 
 
-def highlight_dihedral(mol, dihedral, save_path=None):  
+def get_index_convert(rdmol1, rdmol2):
+    mcs = rdFMCS.FindMCS([rdmol1, rdmol2])
+    patt = Chem.MolFromSmarts(mcs.smartsString)
+
+    query_match = rdmol1.GetSubstructMatch(patt)
+    template_match = rdmol2.GetSubstructMatch(patt)
+
+    return {query_match[i]: template_match[i] for i in range(len(query_match))}
+
+
+def highlight_dihedral(mol, mol_wo_H, index_convert, dihedral, save_path=None):  
     """
     Creates an image of the molecule with the dihedral of interest highlighted in red
     
@@ -183,20 +193,6 @@ def highlight_dihedral(mol, dihedral, save_path=None):
     Returns:
         None
     """
-
-    mol = Chem.Mol(mol)
-    mol_wo_H = Chem.RemoveHs(mol)
-
-    mcs = rdFMCS.FindMCS([mol, mol_wo_H])
-    patt = Chem.MolFromSmarts(mcs.smartsString)
-
-    query_match = mol.GetSubstructMatch(patt)
-    template_match = mol_wo_H.GetSubstructMatch(patt)
-
-    index_convert = {query_match[i]: template_match[i] for i in range(len(query_match))}
-    index_convert_rev = {template_match[i]: query_match[i] for i in range(len(query_match))}
-    print(index_convert)
-    print(index_convert_rev)
 
     new_dihedral = list()
 

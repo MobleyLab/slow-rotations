@@ -359,7 +359,7 @@ class TorsionFinder():
 
 
 	@staticmethod
-	def get_bounds_mindist(X, scores, num_components, peaks, tolerance=10):
+	def get_bounds_mindist(X, scores, num_components, peaks, tolerance=50):
 		'''
 		get the bounds based of each peak by assigning each score value to its closest peak
 		
@@ -392,6 +392,8 @@ class TorsionFinder():
 			else:
 				cluster_labels.append(TorsionFinder.get_closest_peak(a, peaks))
 				new_angles.append(a)
+
+		new_angles = (sorted(new_angles))
 
 		min_max = []
 
@@ -431,7 +433,7 @@ class TorsionFinder():
 
 
 	@staticmethod
-	def get_bounds_knn(X, num_components, peaks, tolerance=30):
+	def get_bounds_knn(X, num_components, peaks, tolerance=40):
 		'''
 		get the bounds based of each peak using k nearest neighbor algorithm
 		
@@ -505,6 +507,8 @@ class TorsionFinder():
 			pdf_individual: probability distribution function of the individual peak
 			[float, float]: minimum and maximum used
 		'''	
+
+		print(min_max)
 		num_components = 1
 		min_bnd = min_max[0]
 		max_bnd = min_max[1]
@@ -516,7 +520,7 @@ class TorsionFinder():
 		max_idx = None
 
 		for i,point in enumerate(X):
-			if point[0] >= min_bnd and point[0] < max_bnd:
+			if point[0] >= min_bnd and point[0] <= max_bnd:
 				single_state_X.append(point)
 
 			if point[0] >= min_bnd and not min_idx:
@@ -529,6 +533,9 @@ class TorsionFinder():
 			max_idx = len(X) - 1
 
 		mm = [min_idx, max_idx]
+
+		if len(single_state_X) < 5:
+			print(single_state_X)
 
 		gmm, x, pdf, pdf_individual = TorsionFinder.get_gmm(single_state_X, num_components, angle_min)
 
@@ -907,11 +914,13 @@ class ProteinTorsionFinder(TorsionFinder):
 	''' Class for running analysis on protein sidechain torsions
 	'''
 
-	def __init__(self, trajf: str, topf: str, ligcode: str):
+	def __init__(self, trajf: str, topf: str, ligcode=None):
 		TorsionFinder.__init__(self, trajf, topf)
-		self.ligcode = ligcode
+		if ligcode != None:
+			self.ligcode = ligcode
+			self.ligand = self.mda_universe.select_atoms(f'resname {self.ligcode}')
 		self.aa_only = self.mda_universe.select_atoms("protein and (name N or name CA or name C or name O or name CB)")
-		self.ligand = self.mda_universe.select_atoms(f'resname {self.ligcode}')
+		
 
 	def get_binding_residues(self, A_cutoff: float):
 		''' 
@@ -1251,7 +1260,7 @@ class ProteinTorsionFinder(TorsionFinder):
 
 			woH_adj_dih = mappings.convert_dihedral(mapping, adj_dih)
 
-			rdw.highlight_dihedral(rdmol_woH, woH_adj_dih, save_path)
+			rdw.highlight_dihedral(rdmol_wH, rdmol_woH, mapping, woH_adj_dih, save_path)
 
 
 
@@ -1308,6 +1317,10 @@ class LigandTorsionFinder(TorsionFinder):
 
 		os.unlink(pdb_fixed_atype.name)
 		os.unlink(pdb_incorrect_atype.name)
+
+
+		self.rdmol_wo_H = Chem.RemoveHs(self.rdmol)
+		self.H_noH_index_convert = rdw.get_index_convert(self.rdmol, self.rdmol_wo_H)
 
 
 	def _check_top_has_conect(self, topf):
@@ -1453,8 +1466,7 @@ class LigandTorsionFinder(TorsionFinder):
 			if atom != pos_2:
 				pos_4 = atom
 				break
-
-		if any([pos_1, pos_2, pos_3, pos_4]) == []:
+		if any(p == [] for p in [pos_1, pos_2, pos_3, pos_4]):
 			raise BadTorsionError
 
 		# returned as a list to be able to properly index the atoms
@@ -1490,7 +1502,7 @@ class LigandTorsionFinder(TorsionFinder):
 			  without Hs
 			* compares the 2 to get atom orderings via MCS
 		'''
-		rdw.highlight_dihedral(self.rdmol_unsanitized, dihedral, save_path)
+		rdw.highlight_dihedral(self.rdmol_unsanitized, self.rdmol_wo_H, self.H_noH_index_convert, dihedral, save_path)
 
 
 	def make_torsion_img_no_shift(self, torsion, save_path=None):
@@ -1557,7 +1569,7 @@ class LigandTorsionFinder(TorsionFinder):
 		d1,d2,d3,d4 = tuple(torsion)
 
 		torsion_sys = [self.convert_idx_to_sysidx(i) for i in torsion]
-		angles = self.get_torsion_angles(torsion)
+		angles = self.get_torsion_angles(torsion_sys)
 
 		angle_min, angles = TorsionFinder.shift_torsion_angles(angles, angle_min=angle_min)
 		angles = angles.flatten()
@@ -1570,9 +1582,6 @@ class LigandTorsionFinder(TorsionFinder):
 			ax.set_title(title)
 		if save_path:
 			plt.savefig(save_path)
-
-
-
 
 	def make_torsion_img(self, torsion, angle_min=None,  save_path=None):
 		''' 
@@ -1599,7 +1608,7 @@ class LigandTorsionFinder(TorsionFinder):
 		sel_a_in_dih = self.mda_universe.select_atoms(f"index {torsion_sys[0]}")
 		sel_resid = sel_a_in_dih[0].residue
 
-		f,ax = plt.subplots(1, 3, figsize=(25, 6.25))
+		f,ax = plt.subplots(2, 2, figsize=(18, 13))
 		sup_title = f"{sel_resid.resname} {sel_resid.resid} ({d1},{d2},{d3},{d4})"
 		f.suptitle(sup_title,fontsize=60)
 		f.tight_layout(pad=3.5)
@@ -1626,33 +1635,37 @@ class LigandTorsionFinder(TorsionFinder):
 		with tempfile.NamedTemporaryFile(suffix='.png') as highlightpng:
 			self.highlight_dihedral(torsion, save_path=highlightpng)
 			img = np.asarray(Image.open(highlightpng.name))
-			ax[0].imshow(img)
-			ax[0].axis('off')
+			ax[0,0].imshow(img)
+			ax[0,0].axis('off')
 
 		states_list = [f"s{i}" for i in range(num_peaks)]
 
 		pdf_colors = ['red', 'orange', 'green', 'blue', 'purple', 'brown']
 
-		TorsionFinder.plot_dihedral_histogram(angles, ax=ax[1], show=False, angle_min=angle_min, pdf_individual=pdf_individual,pdf_colors = pdf_colors)
+		TorsionFinder.plot_dihedral_scatter(angles, ax=ax[0,1], show=False, angle_min=angle_min,)
 
-		ax[1].legend(states_list)
+		TorsionFinder.plot_dihedral_histogram(angles, ax=ax[1,1], show=False, angle_min=angle_min, pdf_individual=pdf_individual,pdf_colors = pdf_colors)
+
+		ax[1,1].legend(states_list)
 		g = self.get_statistical_inefficiency(angles)
-		ax[1].set_title(f'statistical inefficiency, g = {round(g,2)}', fontsize=15, color='black')
+		#ax[1].set_title(f'statistical inefficiency, g = {round(g,2)}', fontsize=15, color='black')
 
 
 		
-		TorsionFinder.plot_transition_counts(transition_ctr, ax=ax[2], colors=pdf_colors)
+		TorsionFinder.plot_transition_counts(transition_ctr, ax=ax[1,0], colors=pdf_colors)
 
 		symmetry = False
 		if mappings.check_symmetry(self.rdmol, torsion):
 			# if there is symmetry add a note on the image
 			symmetry = True
-			ax[2].text(0.01, 0.01, f'** Warning: torsion has symmetry, disregard transitions', fontsize=15, color='red')
+			ax[1,0].text(0.01, 0.01, f'** Warning: torsion has symmetry, disregard transitions', fontsize=15, color='red')
 
 		populations = TorsionFinder.state_populations(angles, min_max)
 
 		if save_path:
 			plt.savefig(save_path)
+
+		plt.close()
 		return min_max, transition_ctr, states_list, symmetry, populations
 
 

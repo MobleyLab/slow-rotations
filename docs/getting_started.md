@@ -13,7 +13,7 @@ This guide will help you quickly install `slow-rotations`. A molecular dynamics 
 
 2. Install the environment needed to run slow-rotations
 	```
-	mamba env install -f environment.yaml
+	mamba env create -f environment.yaml
 	```
 
 3. Install slow-rotations from the top level of the slow-rotations github repository

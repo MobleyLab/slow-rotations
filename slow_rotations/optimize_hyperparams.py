@@ -1,4 +1,4 @@
-import torsions as tor
+from slow_rotations import torsions as tor
 import matplotlib.pyplot as plt
 import numpy as np
 

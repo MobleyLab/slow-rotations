@@ -10,7 +10,6 @@ from .analysis import *
 from .compare import *
 from .mappings import *
 from .molconverter import *
-from .optimize_hyperparams import *
 from .pdb_writer import *
 from .rdkit_wrapper import *
 from .torsions import *

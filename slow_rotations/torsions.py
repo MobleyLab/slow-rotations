@@ -54,25 +54,6 @@ class TorsionFinder():
 		self.topf = topf
 		self.mda_universe = mda.Universe(self.topf, self.trajf)
 
-		# solute = self.mda_universe.select_atoms("not resname HOH")
-
-		# with tempfile.NamedTemporaryFile(suffix='.xtc') as no_solvent_xtc:
-		# 	with tempfile.NamedTemporaryFile(suffix='.gro') as no_solvent_gro:
-
-		# 		print("writing out set_xticks")
-		# 		with mda.Writer(no_solvent_xtc.name, solute.n_atoms) as W:
-		# 			for ts in self.mda_universe.trajectory:
-		# 				W.write(solute)
-
-		# 		print("writing out gro")
-				
-		# 		with mda.Writer(no_solvent_gro.name, solute.n_atoms) as W:
-		# 			for ts in self.mda_universe.trajectory[0]:
-		# 				W.write(solute)
-
-		# 		print("finished writing out gro")
-
-		# 		self.mda_universe = mda.Universe(no_solvent_gro.name, no_solvent_xtc.name)
 
 	def get_torsions():
 		raise utils.NotImplementedError
@@ -508,7 +489,6 @@ class TorsionFinder():
 			[float, float]: minimum and maximum used
 		'''	
 
-		print(min_max)
 		num_components = 1
 		min_bnd = min_max[0]
 		max_bnd = min_max[1]
@@ -533,9 +513,6 @@ class TorsionFinder():
 			max_idx = len(X) - 1
 
 		mm = [min_idx, max_idx]
-
-		if len(single_state_X) < 5:
-			print(single_state_X)
 
 		gmm, x, pdf, pdf_individual = TorsionFinder.get_gmm(single_state_X, num_components, angle_min)
 
@@ -648,9 +625,8 @@ class TorsionFinder():
 		for s in range(num_states):
 			pops[s] /= len(angles)
 
+
 		return pops
-
-
 
 
 	@staticmethod
@@ -670,26 +646,85 @@ class TorsionFinder():
 
 		which_state = []
 
+		transition_ctr = transitions.TransitionMatrixCounter(num_states)
+
+		prev_state = None
 
 		for num in angles:
+			print(which_state)
 			categorized = False
 			for i in range(0, num_states):
 				if range_of_states == (None, None):
 					continue
 				if range_of_states[i][0] <= num <= range_of_states[i][1]:
-					which_state.append(i)
+					state = i
+					if prev_state == None:
+						prev_state = state
+					which_state.append(state)
 					categorized = True
+
 			if not categorized:
 				which_state.append(-1)
+				prev_state = -1
 
-		transition_ctr = transitions.TransitionMatrixCounter(num_states)
+			else:
+				if state != prev_state:
+					state_max = range_of_states[state][1]
+					state_min = range_of_states[state][0]
+					center_min = state_min + 0.375 * (state_max - state_min)
+					center_max = state_min + 0.625 * (state_max - state_min)
+					if num < center_max and num > center_min: 
+						transition_ctr.increment_transition(prev_state, state)
+						prev_state = state
 
-		for i in range(1, len(which_state)):
-			if which_state[i] != which_state[i-1]:
-				# left which_state[i-1]
-				# entered which_state[i]
-				transition_ctr.increment_transition(which_state[i-1], which_state[i])
 		return transition_ctr
+
+
+	#@staticmethod
+	# def transition_matrix(angles, range_of_states):
+	# 	'''
+	# 	count the transitions in and out each state (matrix)
+		
+	# 	Args:
+	# 		[float]: angles
+	# 		range_of_states: [[float, float]]; bounds of the peaks 
+		
+	# 	Returns:
+	# 		TransitionMatrixCounter 
+	# 	'''
+
+	# 	num_states = len(range_of_states)
+
+	# 	which_state = []
+
+
+
+
+	# 	for num in angles:
+	# 		categorized = False
+	# 		for i in range(0, num_states):
+	# 			if range_of_states == (None, None):
+	# 				continue
+	# 			if range_of_states[i][0] <= num <= range_of_states[i][1]:
+	# 				which_state.append(i)
+	# 				categorized = True
+
+
+	# 		if not categorized:
+	# 			which_state.append(-1)
+
+	# 	transition_ctr = transitions.TransitionMatrixCounter(num_states)
+
+
+	# 	with open('/Users/megosato/Desktop/states.txt', 'w') as f:
+	# 		f.write(str(which_state))
+
+	# 	for i in range(1, len(which_state)):
+	# 		if which_state[i] != which_state[i-1]:
+	# 			# left which_state[i-1]
+	# 			# entered which_state[i]
+	# 			transition_ctr.increment_transition(which_state[i-1], which_state[i])
+	# 	return transition_ctr
 
 
 	# def check_transitions(self, transition_counter, min_transitions):
@@ -905,7 +940,9 @@ class TorsionFinder():
 			plt.savefig(save_path)
 
 		plt.close()
-		return angle_min
+		populations = TorsionFinder.state_populations(angles, min_max)
+
+		return angle_min, transition_ctr, states_list, populations
 
 
 
@@ -922,7 +959,7 @@ class ProteinTorsionFinder(TorsionFinder):
 		self.aa_only = self.mda_universe.select_atoms("protein and (name N or name CA or name C or name O or name CB)")
 		
 
-	def get_binding_residues(self, A_cutoff: float):
+	def get_binding_residues(self, A_cutoff: float=5):
 		''' 
 		identify all residues within A_cutoff angstroms of the ligand
 		
@@ -1031,7 +1068,7 @@ class ProteinTorsionFinder(TorsionFinder):
 		return s1
 
 
-	def get_chi_x_residues(self, x, sel=None, a_cutoff=None):
+	def get_chi_x_residues(self, x, sel=None, a_cutoff=5):
 		''' 
 		identify the chi torsion atom indices of specified residue indices at the specified chi angle
 		
@@ -1154,7 +1191,7 @@ class ProteinTorsionFinder(TorsionFinder):
 
 	def get_chi_x_aid(self, x, resgrp):
 		''' 
-		returns a list of lists of atom indices (aid)
+		returns a list of tuples of atom indices (aid)
 		
 		Args:
 			x: int; chi angle (ex. 2 for chi2)
@@ -1174,7 +1211,7 @@ class ProteinTorsionFinder(TorsionFinder):
 		return chi_aid_np.transpose()
 
 
-	def get_chi_x_torsions(self, x, sel=None, a_cutoff=None):
+	def get_chi_x_torsions(self, x, sel=None, a_cutoff=5):
 		''' 
 		returns a list of chi x torsions atom indices in the protein given the selection (sel)
 		Args:
@@ -1199,7 +1236,7 @@ class ProteinTorsionFinder(TorsionFinder):
 		return self.get_chi_x_aid(x, chi_x_resgrp)
 
 
-	def get_all_chi_x_torsions(self, sel=None, a_cutoff=None):
+	def get_all_chi_x_torsions(self, sel=None, a_cutoff=5):
 		torsions = []
 		for x in range(8):
 			chi_x_reslst = self.get_chi_x_torsions(x, sel, a_cutoff)
@@ -1256,31 +1293,116 @@ class ProteinTorsionFinder(TorsionFinder):
 
 			mapping = mappings.map_mols(rdmol_wH, rdmol_woH)
 
-			adj_dih = [idx - min_res_aidx for idx in torsion]
+			adj_dih = [int(idx - min_res_aidx) for idx in torsion]
 
 			woH_adj_dih = mappings.convert_dihedral(mapping, adj_dih)
 
 			rdw.highlight_dihedral(rdmol_wH, rdmol_woH, mapping, woH_adj_dih, save_path)
+
+		return rdmol_wH, adj_dih
 
 
 
 	def determine_chi_x(self, torsion):
 		raise utils.NotImplementedError
 
+	def make_torsion_img(self, torsion, angle_min=None,  save_path=None):
+		''' 
+		create a matplot lib figure of scatter plot
+		
+		Args:
+			torsion: [int, int, int, int]: torsions atom indices
+			angle_min: int; minimum angle of the histogram
+			save_path: str; path to save image to 
+		
+		Returns:
+			[[float, float]]: torsion state boundaries
+			TransitionMatrixCounter: counts of transitions between states
+			[str]: names of each state
+			bool: True if torison has symmetry, False otherwise
+			float: populations of each state
 
+		'''
+
+		d1,d2,d3,d4 = tuple(torsion)
+
+		torsion_sys = [self.convert_idx_to_sysidx(i) for i in torsion]
+
+		sel_a_in_dih = self.mda_universe.select_atoms(f"index {torsion_sys[0]}")
+		sel_resid = sel_a_in_dih[0].residue
+
+		f,ax = plt.subplots(2, 2, figsize=(18, 13))
+		sup_title = f"{sel_resid.resname} {sel_resid.resid} ({d1},{d2},{d3},{d4})"
+		f.suptitle(sup_title,fontsize=60)
+		f.tight_layout(pad=3.5)
+
+		angles = self.get_torsion_angles(torsion_sys)
+
+		X, scores, angle_min = TorsionFinder.get_kde(angles, angle_min=angle_min)
+
+		num_peaks, peaks = TorsionFinder.get_kde_num_peaks(X, scores, smoothing_window=30, peak_prominence=0.01)
+
+		min_max = TorsionFinder.get_bounds_mindist(X, scores, num_peaks, peaks)
+
+		angle_min, angles = TorsionFinder.shift_torsion_angles(angles, angle_min=angle_min)
+
+
+		transition_ctr = TorsionFinder.transition_matrix(angles, min_max)
+
+		pdf_individual = []
+		for mm in min_max:
+			gmm,x,pdf,pdfi,bounds = TorsionFinder.get_individual_gmm(X, angle_min, mm)
+			pdf_individual.append(pdfi)
+
+		rdmol_wH, adj_dih  = (None, None)
+		with tempfile.NamedTemporaryFile(suffix='.png') as highlightpng:
+			rdmol_wH, adj_dih = self.highlight_dihedral(torsion, save_path=highlightpng)
+			img = np.asarray(Image.open(highlightpng.name))
+			ax[0,0].imshow(img)
+			ax[0,0].axis('off')
+
+		states_list = [f"s{i}" for i in range(num_peaks)]
+
+		pdf_colors = ['red', 'orange', 'green', 'blue', 'purple', 'brown']
+
+		TorsionFinder.plot_dihedral_scatter(angles, ax=ax[0,1], show=False, angle_min=angle_min,)
+
+		TorsionFinder.plot_dihedral_histogram(angles, ax=ax[1,1], show=False, angle_min=angle_min, pdf_individual=pdf_individual,pdf_colors = pdf_colors)
+
+		ax[1,1].legend(states_list)
+		g = self.get_statistical_inefficiency(angles)
+
+
+		
+		TorsionFinder.plot_transition_counts(transition_ctr, ax=ax[1,0], colors=pdf_colors)
+
+		symmetry = False
+		if mappings.check_symmetry(rdmol_wH, adj_dih):
+			# if there is symmetry add a note on the image
+			symmetry = True
+			ax[1,0].text(0.01, 0.01, f'** Warning: torsion has symmetry, disregard transitions', fontsize=15, color='red')
+
+		populations = TorsionFinder.state_populations(angles, min_max)
+
+		if save_path:
+			plt.savefig(save_path)
+
+		plt.close()
+		return min_max, transition_ctr, states_list, symmetry, populations
 
 
 class LigandTorsionFinder(TorsionFinder):
 	''' 
 	Analyze torsions in the ligand of a system
 	'''
-	def __init__(self, trajf: str, topf: str, ligcode: str, smiles: str):
+	def __init__(self, trajf: str, topf: str, ligcode: str, smiles: str, torsion_smarts: None):
 		''' 
 		Args:
 			trajf:  str; simulation trajectory file
 			topf:	str; topology file 
 			ligcode: str; 3 letter ligand code
 			smiles: str; smiles string for the ligand of interest
+			torsion_smarts: str; by default None, can input user specificed torsion smarts to analyze more or fewer torsions of interest. by default analyzes all non-terminal torsions, plus R-C-O-H, R-C-N-H, R-C-S-H
 
 		'''
 
@@ -1289,13 +1411,21 @@ class LigandTorsionFinder(TorsionFinder):
 		self.smiles = smiles
 		self.ligcode = ligcode
 		self.trajectory_len = len(self.mda_universe.trajectory)
+		self.torsion_smarts = torsion_str
 
-
-
+		# pdb_incorrect_atype_buf = StringIO()
+		# pdb_fixed_atype_buf = StringIO()
+	    # pdb_block = buf.getvalue()
 
 		pdb_incorrect_atype = tempfile.NamedTemporaryFile(suffix='.pdb', delete=False)
 		pdb_fixed_atype = tempfile.NamedTemporaryFile(suffix='.pdb', delete=False)
 		selection = f"resname {self.ligcode}"
+		selection_g = self.mda_universe.select_atoms(selection)
+		u_lig = mda.Merge(selection_g)
+
+		coords = np.array([selection_g.positions.copy() for _ in self.mda_universe.trajectory])
+		u_lig.load_new(coords, format=mda.coordinates.memory.MemoryReader)
+		self.mda_universe = u_lig
 
 
 		self.rdmol = None
@@ -1312,7 +1442,7 @@ class LigandTorsionFinder(TorsionFinder):
 				self.rdmol = rdw.sanitize_rdmol(Chem.Mol(self.rdmol_unsanitized))
 
 			except AtomValenceException:
-				frame += 1
+				frame += 10
 				continue
 
 		os.unlink(pdb_fixed_atype.name)
@@ -1320,6 +1450,10 @@ class LigandTorsionFinder(TorsionFinder):
 
 
 		self.rdmol_wo_H = Chem.RemoveHs(self.rdmol)
+
+		Chem.MolToMolFile(self.rdmol_wo_H, '/Users/megosato/Desktop/lig4_noH.mol')
+		Chem.MolToMolFile(self.rdmol, '/Users/megosato/Desktop/lig4.mol')
+
 		self.H_noH_index_convert = rdw.get_index_convert(self.rdmol, self.rdmol_wo_H)
 
 
@@ -1391,6 +1525,8 @@ class LigandTorsionFinder(TorsionFinder):
 		'''
 		selection = f"resname {self.ligcode}"
 		ags = self.mda_universe.select_atoms(selection)
+
+		num_atoms = self.mda_universe.atoms.n_atoms
 		indices = [ a.index for a in ags ]
 		return int(min(indices) + idx)
 
@@ -1471,6 +1607,7 @@ class LigandTorsionFinder(TorsionFinder):
 
 		# returned as a list to be able to properly index the atoms
 		# of the mda universe
+
 		return [pos_1, pos_2, pos_3, pos_4]
 
 	def get_torsions(self):
@@ -1486,7 +1623,7 @@ class LigandTorsionFinder(TorsionFinder):
 		# only get torsions for bonds that are rotatable 
 		# rotatable bonds cannot be terminal
 		torsions = []
-		for bond in rdw.get_rotatable_bonds(self.rdmol):
+		for bond in rdw.get_rotatable_bonds(self.rdmol, self.torsion_smarts):
 			try:
 				torsion = self._get_torsion(bond)
 				torsions.append(torsion)
@@ -1548,7 +1685,6 @@ class LigandTorsionFinder(TorsionFinder):
 			plt.savefig(save_path)
 
 
-
 	def plot_dihedral_scatter(self, torsion, ax=None, angle_min=None, title=None, save_path=None):
 		''' 
 		create a matplot lib figure of scatter plot
@@ -1574,14 +1710,24 @@ class LigandTorsionFinder(TorsionFinder):
 		angle_min, angles = TorsionFinder.shift_torsion_angles(angles, angle_min=angle_min)
 		angles = angles.flatten()
 
-		ax.scatter(np.arange(len(angles)), angles)
-		ax.set_ylabel("Dihedral Angle (˚) --")
-		ax.set_xlabel("Frame")
+		#ax.scatter(np.arange(len(angles)), angles)
+		x = np.arange(len(angles))
+
+		low_mask = angles < 160
+		high_mask = angles >= 160
+
+		ax.scatter(x[low_mask], angles[low_mask], label="< 160°", color='red')
+		ax.scatter(x[high_mask], angles[high_mask], label="≥ 160°", color='orange')
+
+		ax.set_ylabel("Dihedral Angle (˚)")
+		ax.set_xlabel("Simulation Time")
 		ax.set_ylim([angle_min,angle_min+360])
+		ax.set_xticks([0, 1, 2, 3, 4, 5])
 		if title: 
 			ax.set_title(title)
 		if save_path:
 			plt.savefig(save_path)
+	
 
 	def make_torsion_img(self, torsion, angle_min=None,  save_path=None):
 		''' 

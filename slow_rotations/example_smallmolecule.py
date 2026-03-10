@@ -10,16 +10,14 @@ import warnings
 import json
 
 tf_list = []
-for rpt in range(3):
+for rpt in range(1,3):
 	print("Loading repeat {rpt}")
-	lmda=0
-	topf_bnd = 'traj.gro'
-	trajf_bnd = f'traj_{rpt+1}.xtc'
+	topf_bnd = '/Users/megosato/Desktop/lig3_flex_move/complex_wat.prmtop'
+	trajf_bnd = f'/Users/megosato/Desktop/lig3_flex_move/lig3_{rpt+1}.nc'
 
-	smiles = "[H]c1c(c(c(c(c1C(=O)O[H])O[H])[H])N([H])[H])[H]" #ZINC922
+	smiles = "C1(=NC(=CC(=C1C#N)N([H])[H])N(C(CC2=CC(=CC=C2C)C)=O)[H])OCC"
 
 	ligcode1 = "LIG"
-	ligcode2 = "UNL"
 	ligtor_bnd = tor.LigandTorsionFinder(str(trajf_bnd),str(topf_bnd),ligcode1,smiles)
 
 	tf_list.append(ligtor_bnd)
@@ -32,6 +30,8 @@ torsions = ligcomp.get_torsions()
 
 results = {}
 for idx,t in enumerate(torsions):
+	if t[0] != 1:
+		continue
 	imgname = f'{"_".join(map(str, t))}.png'
 	t_result = ligcomp.plot_all_distributions(t,save_path=f"../example/{imgname}")
 	results[f't{idx}'] = t_result

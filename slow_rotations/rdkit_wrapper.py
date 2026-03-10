@@ -153,22 +153,46 @@ def get_mapped_bonds(mol, mapped_atoms):
             hit_bonds.append(mol.GetBondBetweenAtoms(aid1,aid2).GetIdx())
     return hit_bonds
 
-def get_rotatable_bonds(mol):
-    """
-    Finds the rotatable bonds in molecule. A rotatable bond is a single, non-ring bond between two nonterminal, non–triple-bonded atoms. 
+ROTATABLE_SMARTS = (
+    '[!$(*#*)&!D1,$([C;D2]-[O,N,S;H1])]'  # Left atom: non-terminal heavy OR C attached to hetero with H
+    '-!@'                                  # Single non-ring bond
+    '[!$(*#*)&!D1,$([C;D2]-[O,N,S;H1])]'  # Right atom: same
+)
+ROTATABLE_QUERY = Chem.MolFromSmarts(ROTATABLE_SMARTS)
+if ROTATABLE_QUERY is None:
+    raise RuntimeError("Rotatable bond SMARTS failed to parse")
 
+def get_rotatable_bonds(mol, torsion_smarts=None):
+    """
+    Finds rotatable bonds in a molecule.
+
+    BY DEFAULT Flags:
+        - Standard rotatable bonds (R-C-C-R, etc.)
+        - Terminal hetero torsions R-C-X-H (alcohols, amines, thiols)
+    
     Args:
-        mol: (Chem.Mol) RDKit Mol
+        mol (Chem.Mol): RDKit molecule
 
     Returns:
-        list: list of RDKit Mol bonds that are rotatable
+        list of Chem.Bond: RDKit bond objects representing rotatable bonds
     """
-    rotbond = Chem.MolFromSmarts('[!$(*#*)&!D1]-&!@[!$(*#*)&!D1]')
-    rotbonds = mol.GetSubstructMatches(rotbond)
+    # Get all matches of the SMARTS pattern
+    if torison_str==None:
+        matches = mol.GetSubstructMatches(ROTATABLE_QUERY)
+    else:
+        matches = mol.GetSubstructMatches(torsion_smarts)
+    
     bonds = []
-    for i1,i2 in rotbonds:
-        bonds.append(mol.GetBondBetweenAtoms(i1,i2))
-    return list(bonds)
+    for match in matches:
+        # match is a tuple of two atom indices
+        if len(match) != 2:
+            continue  # skip unexpected matches
+        i1, i2 = match
+        bond = mol.GetBondBetweenAtoms(i1, i2)
+        if bond is not None:
+            bonds.append(bond)
+    
+    return bonds
 
 
 def get_index_convert(rdmol1, rdmol2):
@@ -201,15 +225,17 @@ def highlight_dihedral(mol, mol_wo_H, index_convert, dihedral, save_path=None):
             new_dihedral.append(index_convert[aid])
 
         except KeyError:
+            print("KEY ERROR")
             pass
 
     AllChem.Compute2DCoords(mol_wo_H)
 
-    #for atm in mol_wo_H.GetAtoms():
-    #    atm.SetProp("atomNote", str(index_convert_rev[atm.GetIdx()]))
-        
+    for atm in mol_wo_H.GetAtoms():
+        atm.SetProp("atomNote", str(atm.GetIdx()))
     highlightAtoms = get_mapped_heavy_atom_indices(mol_wo_H, new_dihedral)
+
     highlightBonds = get_mapped_bonds(mol_wo_H, new_dihedral)
+
 
     Draw.MolToImageFile(
         mol_wo_H,

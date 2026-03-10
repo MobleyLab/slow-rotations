@@ -257,6 +257,8 @@ class LigandTorsionComparator(TorsionComparator):
 			# plot scatter
 			tor.TorsionFinder.plot_dihedral_scatter(shifted_angles, ax =ax[idx+1,0], angle_min=angle_min)
 
+			print("POPULATIONS", tor.TorsionFinder.state_populations(angles, min_max))
+
 			label = f'Repeat {idx+1}'
 			ax[idx+1,0].text(-0.2, 0.5, label, va='center', ha='center', rotation='vertical', fontsize=20, transform=ax[idx+1,0].transAxes)
 
@@ -279,7 +281,7 @@ class LigandTorsionComparator(TorsionComparator):
 
 
 class ProteinTorsionComparator(TorsionComparator):
-	def __init__(self, tf_list: list, a_cutoff: float):
+	def __init__(self, tf_list: list, a_cutoff: float=5):
 		'''
 		Protein Comparator
 
@@ -393,6 +395,8 @@ class ProteinTorsionComparator(TorsionComparator):
 			transition_ctr = tor.TorsionFinder.transition_matrix(shifted_angles, min_max)
 			tor.TorsionFinder.plot_transition_counts(transition_ctr, ax=ax[idx+1,2], colors=pdf_colors)
 			transition_populations = tor.TorsionFinder.state_populations(angles, min_max)
+
+			print(torsion, "POPULATIONS", tor.TorsionFinder.state_populations(angles, min_max))
 
 			# plot scatter
 			tor.TorsionFinder.plot_dihedral_scatter(shifted_angles, ax =ax[idx+1,0], angle_min=angle_min)

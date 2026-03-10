@@ -56,6 +56,8 @@ class TransitionMatrixCounter():
 	def increment_transition(self, state1, state2):
 		# transitions from state1 into state2
 
+		print(state1, state2)
+
 		if state1 == -1:
 			self.transition_dict['Ø'][state2] += 1
 		elif state2 == -1:
@@ -75,13 +77,12 @@ class TransitionMatrixCounter():
 		minimum = 9999999999999
 		for s1 in self.transition_dict.keys():
 			for s2 in self.transition_dict[s1].keys():
-				if s1 == s2: # or s1 == 'Ø' or s2 == 'Ø':
+				if s1 == s2 or s1 == 'Ø' or s2 == 'Ø':
 					continue
 				if self.transition_dict[s1][s2] < minimum:
 					minimum = self.transition_dict[s1][s2]
 
 		return minimum
-
 
 	def count_transitions_into_state(self, state):
 		ct = 0
@@ -104,13 +105,11 @@ class TransitionMatrixCounter():
 	def max_transitions(self):
 		# note this will mark everything with 1 real state and 1 
 		# catch all state as the default maximum
-
 		maximum = -99999999999999
 		for s1 in self.transition_dict.keys():
 			for s2 in self.transition_dict[s1].keys():
 				if s1 == s2 or s1 == 'Ø' or s2 == 'Ø':
 					continue
-
 				if self.transition_dict[s1][s2] > maximum:
 					maximum = self.transition_dict[s1][s2]		
 		return maximum

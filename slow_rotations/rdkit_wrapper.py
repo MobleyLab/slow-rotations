@@ -177,7 +177,7 @@ def get_rotatable_bonds(mol, torsion_smarts=None):
         list of Chem.Bond: RDKit bond objects representing rotatable bonds
     """
     # Get all matches of the SMARTS pattern
-    if torison_str==None:
+    if torsion_smarts==None:
         matches = mol.GetSubstructMatches(ROTATABLE_QUERY)
     else:
         matches = mol.GetSubstructMatches(torsion_smarts)

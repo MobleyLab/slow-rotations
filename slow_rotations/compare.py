@@ -213,6 +213,7 @@ class LigandTorsionComparator(TorsionComparator):
 		
 		results = {}
 
+		maxlen = max([len(tf.get_torsion_angles(torsion)) for tf in self.tf_list])
 
 		for idx,tf in enumerate(self.tf_list):
 			results[idx] = {}
@@ -255,7 +256,7 @@ class LigandTorsionComparator(TorsionComparator):
 			transition_populations = tor.TorsionFinder.state_populations(angles, min_max)
 
 			# plot scatter
-			tor.TorsionFinder.plot_dihedral_scatter(shifted_angles, ax =ax[idx+1,0], angle_min=angle_min)
+			tor.TorsionFinder.plot_dihedral_scatter(shifted_angles, ax =ax[idx+1,0], angle_min=angle_min, xmax=maxlen)
 
 			print("POPULATIONS", tor.TorsionFinder.state_populations(angles, min_max))
 

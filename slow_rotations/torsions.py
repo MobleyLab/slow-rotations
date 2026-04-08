@@ -540,9 +540,7 @@ class TorsionFinder():
 			pdf_individual: probability distribution function of the individual peakd
 		'''	
 		flat_X = np.array(X).flatten()
-		if len(flat_X) == 1:
-			flat_X = np.array([flat_X[0], flat_X[0]])
-		gmm = GaussianMixture(n_components=num_components).fit(np.array(flat_X).reshape(-1,1))
+		gmm = GaussianMixture(n_components=num_components).fit(np.array(X).reshape(-1,1))
 		x = np.linspace(min(flat_X), max(flat_X), len(X))
 		logprob = gmm.score_samples(x.reshape(-1, 1))
 		responsibilities = gmm.predict_proba(x.reshape(-1, 1))
@@ -748,7 +746,7 @@ class TorsionFinder():
 	# 	pass
 
 	@staticmethod
-	def plot_dihedral_scatter(angles, ax=None, angle_min=None, xmax=None, title=None, show=False, save_path=None):
+	def plot_dihedral_scatter(angles, ax=None, angle_min=None, title=None, show=False, save_path=None):
 
 		if not ax:
 			f, ax = plt.subplots()
@@ -756,8 +754,6 @@ class TorsionFinder():
 		ax.set_ylabel("Dihedral Angle (˚) --")
 		ax.set_xlabel("Frame")
 		ax.set_ylim([angle_min,angle_min+360])
-		if xmax:
-			ax.set_xlim([0, xmax])
 		if title: 
 			ax.set_title(title)
 		if show:

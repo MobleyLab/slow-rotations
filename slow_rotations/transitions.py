@@ -55,9 +55,6 @@ class TransitionMatrixCounter():
 
 	def increment_transition(self, state1, state2):
 		# transitions from state1 into state2
-
-		print(state1, state2)
-
 		if state1 == -1:
 			self.transition_dict['Ø'][state2] += 1
 		elif state2 == -1:
